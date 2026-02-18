@@ -1,0 +1,93 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hortus_app/features/gardens/models/garden_model.dart';
+import 'package:rxdart/rxdart.dart';
+
+class GardenRepository {
+  final FirebaseFirestore _firestore;
+  final FirebaseAuth _auth;
+
+  GardenRepository(this._firestore, this._auth);
+
+  /// 🔹 Référence collection
+  CollectionReference get _gardens => _firestore.collection('gardens');
+
+  /// 🌱 Stream temps réel des jardins du user
+  Stream<List<Garden>> watchUserGardens() {
+    final uid = _auth.currentUser!.uid;
+
+    return _gardens
+        .where('ownerId', isEqualTo: uid)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) =>
+                    Garden.fromMap(doc.data() as Map<String, dynamic>, doc.id),
+              )
+              .toList(),
+        );
+  }
+
+  /// 🌍 Tous les jardins accessibles (perso + publics)
+  Stream<List<Garden>> watchAccessibleGardens() {
+    final uid = _auth.currentUser!.uid;
+
+    final myGardensStream = _gardens
+        .where('ownerId', isEqualTo: uid)
+        .snapshots();
+
+    final publicGardensStream = _gardens
+        .where('isPublic', isEqualTo: true)
+        .snapshots();
+
+    return Rx.combineLatest2<QuerySnapshot, QuerySnapshot, List<Garden>>(
+      myGardensStream,
+      publicGardensStream,
+      (mySnap, publicSnap) {
+        final allDocs = [...mySnap.docs, ...publicSnap.docs];
+
+        final gardens = allDocs
+            .map(
+              (doc) =>
+                  Garden.fromMap(doc.data() as Map<String, dynamic>, doc.id),
+            )
+            .toList();
+
+        /// Supprime doublons si un jardin perso est aussi public
+        final unique = {for (var g in gardens) g.id: g}.values.toList();
+
+        unique.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+        return unique;
+      },
+    );
+  }
+
+  /// 🌿 Ajouter un jardin
+  Future<void> createGarden({
+    required String name,
+    required double width,
+    required double height,
+    required bool isPublic,
+    required bool isEditable,
+  }) async {
+    final uid = _auth.currentUser!.uid;
+
+    await _gardens.add({
+      'name': name,
+      'width': width,
+      'height': height,
+      'isPublic': isPublic,
+      'ownerId': uid,
+      'createdAt': FieldValue.serverTimestamp(),
+      'isEditable': isEditable,
+    });
+  }
+
+  /// 🪓 Supprimer un jardin
+  Future<void> deleteGarden(String id) async {
+    await _gardens.doc(id).delete();
+  }
+}

@@ -1,63 +1,93 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/auth_providers.dart';
 import '../widgets/auth_textfield.dart';
 import 'register_page.dart';
 import 'forgot_password_page.dart';
 
-class LoginPage extends ConsumerWidget {
-  LoginPage({super.key});
-
-  final emailCtrl = TextEditingController();
-  final passCtrl = TextEditingController();
+class LoginPage extends ConsumerStatefulWidget {
+  const LoginPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends ConsumerState<LoginPage> {
+  final usernameCtrl = TextEditingController();
+  final passCtrl = TextEditingController();
+
+  bool isLoading = false;
+
+  Future<void> login() async {
     final auth = ref.read(authServiceProvider);
 
+    setState(() => isLoading = true);
+
+    try {
+      await auth.loginWithUsername(
+        usernameCtrl.text.trim(),
+        passCtrl.text.trim(),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+
+    setState(() => isLoading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text("Connexion", style: TextStyle(fontSize: 32)),
+            const Text(
+              "Connexion",
+              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+            ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 40),
 
-            AuthTextField(controller: emailCtrl, label: "Email"),
+            AuthTextField(controller: usernameCtrl, label: "Username"),
+
             const SizedBox(height: 16),
+
             AuthTextField(
               controller: passCtrl,
               label: "Mot de passe",
               obscure: true,
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 30),
 
-            ElevatedButton(
-              onPressed: () async {
-                await auth.login(emailCtrl.text, passCtrl.text);
-              },
-              child: const Text("Se connecter"),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: isLoading ? null : login,
+                child: isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text("Se connecter"),
+              ),
             ),
+
+            const SizedBox(height: 16),
 
             TextButton(
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => RegisterPage()),
-                );
+                context.push('/register');
               },
               child: const Text("Créer un compte"),
             ),
 
             TextButton(
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => ForgotPasswordPage()),
-                );
+                context.push('/forgot');
               },
               child: const Text("Mot de passe oublié"),
             ),

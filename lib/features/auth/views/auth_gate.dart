@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-
+import 'package:hortus_app/features/home/views/home_page.dart';
+import 'package:hortus_app/features/auth/views/login_page.dart';
 import '../providers/auth_state_provider.dart';
 
 class AuthGate extends ConsumerWidget {
@@ -18,20 +18,11 @@ class AuthGate extends ConsumerWidget {
       error: (e, _) => Scaffold(body: Center(child: Text('Erreur: $e'))),
 
       data: (user) {
-        // 🔹 utilisateur connecté
-        if (user != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            context.go('/home');
-          });
+        if (user == null) {
+          return LoginPage();
+        } else {
+          return const HomePage();
         }
-        // 🔹 pas connecté
-        else {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            context.go('/login');
-          });
-        }
-
-        return const SizedBox.shrink();
       },
     );
   }
