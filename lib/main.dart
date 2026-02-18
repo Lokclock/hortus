@@ -23,10 +23,6 @@ class MyApp extends ConsumerWidget {
     return MaterialApp.router(
       routerConfig: router,
       debugShowCheckedModeBanner: false,
-      
     );
-    home: AuthGate(
-  child: const HomePage(),
-),
   }
 }
