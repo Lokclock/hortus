@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hortus_app/features/map/providers/garden_permissions_provider.dart';
-import 'package:hortus_app/features/map/views/add_plant_sheet.dart';
+import 'package:hortus_app/features/map/views/add_plant_page.dart';
 import 'package:hortus_app/features/map/views/garden_canvas.dart';
 import 'package:hortus_app/features/map/views/positioning_overlay.dart';
 import '../../plants/providers/plant_providers.dart';
@@ -142,7 +142,7 @@ class _BottomMapBar extends ConsumerWidget {
                     showModalBottomSheet(
                       context: context,
                       isScrollControlled: true,
-                      builder: (_) => AddPlantSheet(gardenId: gardenId),
+                      builder: (_) => AddPlantPage(gardenId: gardenId),
                     );
                   },
                 ),
