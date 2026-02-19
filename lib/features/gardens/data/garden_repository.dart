@@ -65,6 +65,17 @@ class GardenRepository {
     );
   }
 
+  /// 🌿 Écoute d’un jardin spécifique
+  Stream<Garden> watchGarden(String gardenId) {
+    return _gardens.doc(gardenId).snapshots().map((doc) {
+      final data = doc.data();
+      if (data == null) {
+        throw Exception("Garden not found");
+      }
+      return Garden.fromMap(data as Map<String, dynamic>, doc.id);
+    });
+  }
+
   /// 🌿 Ajouter un jardin
   Future<void> createGarden({
     required String name,

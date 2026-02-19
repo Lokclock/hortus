@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hortus_app/features/gardens/models/garden_model.dart';
+import 'package:hortus_app/features/gardens/providers/gardens_repository_provider.dart';
 import '../data/garden_repository.dart';
 
 final gardenRepoProvider = Provider<GardenRepository>((ref) {
@@ -14,4 +15,8 @@ final gardensStreamProvider = StreamProvider<List<Garden>>((ref) {
 
 final accessibleGardensProvider = StreamProvider<List<Garden>>((ref) {
   return ref.watch(gardenRepoProvider).watchAccessibleGardens();
+});
+final gardenProvider = StreamProvider.family<Garden, String>((ref, id) {
+  final repo = ref.watch(gardensRepositoryProvider);
+  return repo.watchGarden(id);
 });

@@ -29,7 +29,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/garden/:id',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return GardenMapPage(gardenId: id, canEdit: false);
+          return GardenMapPage(gardenId: id);
         },
       ),
     ],

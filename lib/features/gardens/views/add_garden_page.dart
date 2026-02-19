@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hortus_app/features/gardens/providers/garden_providers.dart';
 
 class AddGardenPage extends ConsumerStatefulWidget {
@@ -35,7 +36,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
           isEditable: isPublic ? isEditable : false,
         );
 
-    if (mounted) Navigator.pop(context);
+    if (mounted) context.push('/home');
   }
 
   @override
