@@ -16,87 +16,81 @@ class PositioningOverlay extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(mapModeProvider);
+    final plantData = ref.watch(addPlantProvider);
 
+    // Si on est en mode view, rien à afficher
     if (mode == MapMode.view) return const SizedBox();
+
+    // Vérifie que les champs obligatoires sont remplis
+    final isReadyToPlant =
+        plantData.name != null &&
+        plantData.name!.isNotEmpty &&
+        plantData.strate != null &&
+        plantData.strate!.isNotEmpty &&
+        plantData.icon != null &&
+        plantData.icon!.isNotEmpty &&
+        plantData.diameter != null;
 
     return Stack(
       children: [
         // assombrissement
         IgnorePointer(
-          ignoring: true, // ne bloque pas les gestes en dehors des boutons
+          ignoring: true,
           child: Container(color: Colors.black.withOpacity(0.1)),
         ),
 
-        /// Viseur centré
+        // Viseur centré
         const Center(child: Crosshair()),
 
-        /// Boutons validation
+        // Bouton planter
         Positioned(
-          bottom: 100,
+          bottom: 40,
           left: 0,
           right: 0,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              FloatingActionButton.extended(
-                heroTag: "cancel",
-                backgroundColor: Colors.red,
-                label: const Text("Annuler"),
-                icon: const Icon(Icons.close),
-                onPressed: () {
-                  ref.read(mapModeProvider.notifier).state = MapMode.view;
-                },
-              ),
-              const SizedBox(width: 24),
-              FloatingActionButton.extended(
-                heroTag: "confirm",
-                backgroundColor: Colors.green,
-                label: const Text("Valider position"),
-                icon: const Icon(Icons.check),
-                onPressed: () async {
-                  final controller = ref.read(mapTransformProvider);
-                  final size = MediaQuery.of(context).size;
+          child: Center(
+            child: FloatingActionButton.extended(
+              heroTag: "plant",
+              backgroundColor: isReadyToPlant ? Colors.green : Colors.grey,
+              label: const Text("Planter!"),
+              icon: const Icon(Icons.check),
+              onPressed: isReadyToPlant
+                  ? () async {
+                      final controller = ref.read(mapTransformProvider);
+                      final size = MediaQuery.of(context).size;
 
-                  final pos = getWorldPosition(
-                    controller: controller,
-                    viewportSize: size,
-                  );
+                      final pos = getWorldPosition(
+                        controller: controller,
+                        viewportSize: size,
+                      );
 
-                  final plantData = ref.read(addPlantProvider);
-                  final repo = ref.read(plantRepoProvider);
+                      final repo = ref.read(plantRepoProvider);
 
-                  if (plantData.id != null && plantData.id!.isNotEmpty) {
-                    // Mise à jour existante
-                    await repo.updatePlant(
-                      Plant(
-                        id: plantData.id!,
+                      final newPlant = Plant(
+                        id: plantData.id ?? "",
                         gardenId: gardenId,
-                        name: plantData.name ?? "",
+                        name: plantData.name!,
                         x: pos.dx,
                         y: pos.dy,
-                        type: plantData.type ?? "default",
-                      ),
-                    );
-                  } else {
-                    // Nouvelle plante
-                    await repo.addPlant(
-                      Plant(
-                        id: "",
-                        gardenId: gardenId,
-                        name: plantData.name ?? "",
-                        x: pos.dx,
-                        y: pos.dy,
-                        type: plantData.type ?? "default",
-                      ),
-                    );
-                  }
+                        diameter: plantData.diameter!,
+                        harvestType: plantData.harvestType ?? {},
+                        strate: plantData.strate!,
+                        icon: plantData.icon!,
+                        plantedAt: plantData.plantedAt ?? DateTime.now(),
+                      );
 
-                  ref.read(mapModeProvider.notifier).state = MapMode.view;
-                  ref.read(addPlantProvider.notifier).state =
-                      const AddPlantState();
-                },
-              ),
-            ],
+                      if (plantData.id != null && plantData.id!.isNotEmpty) {
+                        await repo.updatePlant(newPlant);
+                      } else {
+                        await repo.addPlant(newPlant);
+                      }
+
+                      // Reset le provider et repasse en mode view
+                      ref.read(addPlantProvider.notifier).state =
+                          const AddPlantState();
+                      ref.read(mapModeProvider.notifier).state = MapMode.view;
+                    }
+                  : null, // désactive si champs obligatoires manquants
+            ),
           ),
         ),
       ],

@@ -2,162 +2,282 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hortus_app/features/map/providers/add_plant_provider.dart';
 import 'package:hortus_app/features/map/providers/map_mode_provider.dart';
-import 'package:hortus_app/features/plants/models/plant_model.dart';
 
 class AddPlantPage extends ConsumerStatefulWidget {
   final String gardenId;
-  final Plant? plant; // si non null -> update
 
-  const AddPlantPage({required this.gardenId, this.plant, super.key});
+  const AddPlantPage({super.key, required this.gardenId});
 
   @override
   ConsumerState<AddPlantPage> createState() => _AddPlantPageState();
 }
 
 class _AddPlantPageState extends ConsumerState<AddPlantPage> {
-  late TextEditingController nameCtrl;
-  late TextEditingController scientificCtrl;
-  late TextEditingController varietyCtrl;
+  final PageController _pageController = PageController();
 
-  String selectedType = 'fruit';
-  String selectedStrate = 'herb';
-  String selectedIcon = '🌱';
+  // STEP 1
+  final nameCtrl = TextEditingController();
+  final scientificCtrl = TextEditingController();
+  final varietyCtrl = TextEditingController();
+  DateTime plantedAt = DateTime.now();
 
-  DateTime? plantedAt;
-  DateTime? harvestAt;
+  // STEP 2
+  final harvestTypes = ['fruit', 'fleur', 'feuille', 'racine', 'bois'];
+  Map<String, DateTimeRange?> selectedHarvests = {};
 
-  final types = ['fruit', 'flower', 'root', 'leaf', 'wood'];
-  final typeImages = {
-    'fruit': 'assets/images/harvest_fruit.png',
-    'flower': 'assets/images/harvest_flower.png',
-    'root': 'assets/images/harvest_root.png',
-    'leaf': 'assets/images/harvest_leaf.png',
-    'wood': 'assets/images/harvest_wood.png',
-  };
-
+  // STEP 3
   final strates = ['herb', 'bush', 'shrub', 'tree', 'vine'];
-  final strateImages = {
-    'herb': 'assets/images/strate_herb.png',
-    'bush': 'assets/images/strate_bush.png',
-    'shrub': 'assets/images/strate_shrub.png',
-    'tree': 'assets/images/strate_tree.png',
-    'vine': 'assets/images/strate_vine.png',
-  };
+  String? selectedStrate;
 
+  // STEP 4
   final icons = ['🌱', '🌿', '🌳', '🌷', '🍎'];
+  String? selectedIcon;
+  final diameterCtrl = TextEditingController();
 
-  @override
-  void initState() {
-    super.initState();
-    nameCtrl = TextEditingController(text: widget.plant?.name ?? '');
-    scientificCtrl = TextEditingController(
-      text: widget.plant?.scientificName ?? '',
-    );
-    varietyCtrl = TextEditingController(text: widget.plant?.variety ?? '');
-    selectedType = widget.plant?.type ?? 'fruit';
-    selectedStrate = widget.plant?.strate ?? 'herb';
-    plantedAt = widget.plant?.plantedAt;
-    harvestAt = widget.plant?.harvestAt;
+  int currentStep = 0;
+
+  void _nextStep() {
+    if (!_validateCurrentStep()) return;
+
+    if (currentStep < 3) {
+      setState(() => currentStep++);
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      // Passer au PositioningOverlay
+      ref.read(addPlantProvider.notifier).state = AddPlantState(
+        name: nameCtrl.text,
+        scientificName: scientificCtrl.text,
+        variety: varietyCtrl.text,
+        plantedAt: plantedAt,
+        harvestType: selectedHarvests,
+        strate: selectedStrate!,
+        icon: selectedIcon!,
+        diameter: double.parse(diameterCtrl.text),
+      );
+
+      // Activer le mode positionnement
+      ref.read(mapModeProvider.notifier).state = MapMode.edit;
+
+      // Fermer la page AddPlant
+      Navigator.of(context).pop();
+    }
+  }
+
+  bool _validateCurrentStep() {
+    switch (currentStep) {
+      case 0:
+        if (nameCtrl.text.isEmpty) {
+          _showError("Le nom commun est obligatoire");
+          return false;
+        }
+        return true;
+      case 2:
+        if (selectedStrate == null) {
+          _showError("Veuillez sélectionner une strate");
+          return false;
+        }
+        return true;
+      case 3:
+        if (selectedIcon == null || diameterCtrl.text.isEmpty) {
+          _showError("Veuillez choisir un symbole et entrer le diamètre");
+          return false;
+        }
+        return true;
+      default:
+        return true;
+    }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.plant != null ? 'Modifier plante' : 'Ajouter plante',
+      appBar: AppBar(title: Text("Ajouter une plante")),
+      body: PageView(
+        controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(),
+        children: [_buildStep1(), _buildStep2(), _buildStep3(), _buildStep4()],
+      ),
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.all(16),
+        child: ElevatedButton(
+          onPressed: _nextStep,
+          child: Text(currentStep < 3 ? "Suivant" : "Terminer"),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
+    );
+  }
+
+  // -------------------- STEP 1 --------------------
+  Widget _buildStep1() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          TextField(
+            controller: nameCtrl,
+            decoration: const InputDecoration(labelText: "Nom commun *"),
+          ),
+          TextField(
+            controller: scientificCtrl,
+            decoration: const InputDecoration(labelText: "Nom scientifique"),
+          ),
+          TextField(
+            controller: varietyCtrl,
+            decoration: const InputDecoration(labelText: "Variété"),
+          ),
+          const SizedBox(height: 16),
+          Row(
             children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: "Nom commun"),
-              ),
-              TextField(
-                controller: scientificCtrl,
-                decoration: const InputDecoration(
-                  labelText: "Nom scientifique",
-                ),
-              ),
-              TextField(
-                controller: varietyCtrl,
-                decoration: const InputDecoration(labelText: "Variété"),
-              ),
-              const SizedBox(height: 16),
-              // Type récolte avec image
-              DropdownButtonFormField<String>(
-                value: selectedType,
-                decoration: const InputDecoration(labelText: "Type de récolte"),
-                items: types.map((t) {
-                  return DropdownMenuItem(
-                    value: t,
-                    child: Row(
-                      children: [
-                        Image.asset(typeImages[t]!, width: 24, height: 24),
-                        const SizedBox(width: 8),
-                        Text(t),
-                      ],
-                    ),
-                  );
-                }).toList(),
-                onChanged: (val) => setState(() => selectedType = val!),
-              ),
-              const SizedBox(height: 12),
-              // Strate avec image
-              DropdownButtonFormField<String>(
-                value: selectedStrate,
-                decoration: const InputDecoration(labelText: "Strate végétale"),
-                items: strates.map((s) {
-                  return DropdownMenuItem(
-                    value: s,
-                    child: Row(
-                      children: [
-                        Image.asset(strateImages[s]!, width: 24, height: 24),
-                        const SizedBox(width: 8),
-                        Text(s),
-                      ],
-                    ),
-                  );
-                }).toList(),
-                onChanged: (val) => setState(() => selectedStrate = val!),
-              ),
-              const SizedBox(height: 12),
-              // Icône
-              DropdownButtonFormField<String>(
-                value: selectedIcon,
-                decoration: const InputDecoration(labelText: "Icône"),
-                items: icons
-                    .map((i) => DropdownMenuItem(value: i, child: Text(i)))
-                    .toList(),
-                onChanged: (val) => setState(() => selectedIcon = val!),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
+              const Text("Planté le : "),
+              TextButton(
                 onPressed: () async {
-                  final addPlantNotifier = ref.read(addPlantProvider.notifier);
-                  addPlantNotifier.state = AddPlantState(
-                    id: widget.plant?.id,
-                    name: nameCtrl.text,
-                    scientificName: scientificCtrl.text,
-                    variety: varietyCtrl.text,
-                    type: selectedType,
-                    strate: selectedStrate,
-                    icon: selectedIcon,
-                    plantedAt: plantedAt,
-                    harvestAt: harvestAt,
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: plantedAt,
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
                   );
-                  ref.read(mapModeProvider.notifier).state = MapMode.edit;
-                  Navigator.pop(context);
+                  if (date != null) setState(() => plantedAt = date);
                 },
-                child: Text(widget.plant != null ? "Modifier" : "Ajouter"),
+                child: Text(
+                  "${plantedAt.day}/${plantedAt.month}/${plantedAt.year}",
+                ),
               ),
             ],
           ),
-        ),
+        ],
+      ),
+    );
+  }
+
+  // -------------------- STEP 2 --------------------
+  Widget _buildStep2() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          /// Liste de récoltes
+          Column(
+            children: harvestTypes.map((type) {
+              final selected = selectedHarvests.containsKey(type);
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (selected) {
+                      selectedHarvests.remove(type);
+                    } else {
+                      selectedHarvests[type] = null;
+                    }
+                  });
+                },
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: selected ? Colors.green : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(child: Text(type)),
+                ),
+              );
+            }).toList(),
+          ),
+
+          const SizedBox(width: 16),
+
+          /// Sélection de période
+          Expanded(
+            child: Column(
+              children: selectedHarvests.keys.map((type) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Période $type :"),
+                    TextButton(
+                      onPressed: () async {
+                        final range = await showDateRangePicker(
+                          context: context,
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                        );
+                        if (range != null) {
+                          setState(() => selectedHarvests[type] = range);
+                        }
+                      },
+                      child: Text(
+                        selectedHarvests[type] != null
+                            ? "${selectedHarvests[type]!.start.day}/${selectedHarvests[type]!.start.month} - ${selectedHarvests[type]!.end.day}/${selectedHarvests[type]!.end.month}"
+                            : "Non précisée",
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // -------------------- STEP 3 --------------------
+  Widget _buildStep3() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: strates.map((s) {
+          final selected = selectedStrate == s;
+          return ListTile(
+            title: Text(s),
+            tileColor: selected ? Colors.green.shade200 : null,
+            onTap: () => setState(() => selectedStrate = s),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // -------------------- STEP 4 --------------------
+  Widget _buildStep4() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          GridView.count(
+            crossAxisCount: 5,
+            shrinkWrap: true,
+            children: icons.map((i) {
+              final selected = selectedIcon == i;
+              return GestureDetector(
+                onTap: () => setState(() => selectedIcon = i),
+                child: Container(
+                  margin: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: selected ? Colors.green : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child: Text(i, style: const TextStyle(fontSize: 24)),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: diameterCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: "Diamètre (cm) *"),
+          ),
+        ],
       ),
     );
   }

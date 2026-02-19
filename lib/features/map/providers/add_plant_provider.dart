@@ -1,26 +1,28 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class AddPlantState {
   final String? id;
-  final String? name;
+  final String? name; // nom commun obligatoire
   final String? scientificName;
   final String? variety;
-  final String? type; // type de récolte
-  final String? strate; // strate végétale
-  final String? icon; // icône
-  final DateTime? plantedAt;
-  final DateTime? harvestAt;
+  final String? strate; // herb, bush, shrub, tree, vine
+  final String? icon; // symbole sur la carte
+  final DateTime? plantedAt; // date de plantation
+  final double? diameter; // diamètre en cm
+  final Map<String, DateTimeRange?>?
+  harvestType; // ex: {"fruit": DateTimeRange(...), "fleur": null}
 
   const AddPlantState({
     this.id,
     this.name,
     this.scientificName,
     this.variety,
-    this.type,
     this.strate,
     this.icon,
     this.plantedAt,
-    this.harvestAt,
+    this.diameter,
+    this.harvestType,
   });
 
   AddPlantState copyWith({
@@ -28,22 +30,22 @@ class AddPlantState {
     String? name,
     String? scientificName,
     String? variety,
-    String? type,
     String? strate,
     String? icon,
     DateTime? plantedAt,
-    DateTime? harvestAt,
+    double? diameter,
+    Map<String, DateTimeRange?>? harvestType,
   }) {
     return AddPlantState(
       id: id ?? this.id,
       name: name ?? this.name,
       scientificName: scientificName ?? this.scientificName,
       variety: variety ?? this.variety,
-      type: type ?? this.type,
       strate: strate ?? this.strate,
       icon: icon ?? this.icon,
       plantedAt: plantedAt ?? this.plantedAt,
-      harvestAt: harvestAt ?? this.harvestAt,
+      diameter: diameter ?? this.diameter,
+      harvestType: harvestType ?? this.harvestType,
     );
   }
 }

@@ -78,7 +78,7 @@ class PlantDetailsSheet extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          plant.commonName ?? plant.name,
+                          plant.name,
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -275,9 +275,7 @@ class PlantDetailsSheet extends ConsumerWidget {
   void _openAddPlantPage(BuildContext context, Plant plant) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => AddPlantPage(gardenId: gardenId, plant: plant),
-      ),
+      MaterialPageRoute(builder: (_) => AddPlantPage(gardenId: gardenId)),
     );
   }
 }
