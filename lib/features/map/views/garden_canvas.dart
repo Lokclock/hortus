@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hortus_app/features/map/providers/animated_plant_provider.dart';
 import 'package:hortus_app/features/map/providers/map_transform_provider.dart';
-import 'package:hortus_app/features/map/providers/selected_plant_provider.dart';
 import 'package:hortus_app/features/map/views/plant_details_sheet.dart';
 import 'package:hortus_app/features/plants/models/plant_model.dart';
 
@@ -11,7 +11,6 @@ class GardenCanvas extends ConsumerWidget {
   final bool canEdit;
 
   const GardenCanvas({
-    super.key,
     required this.gardenId,
     required this.plants,
     required this.canEdit,
@@ -31,30 +30,72 @@ class GardenCanvas extends ConsumerWidget {
         color: Colors.green.shade50,
         child: Stack(
           children: plants.map((p) {
+            final diameter = p.diameter ?? 32;
+            final hitSize = diameter / 1.7;
+            final animatedId = ref.watch(animatedPlantProvider);
+            final isAnimated = animatedId == p.id;
+
             return Positioned(
-              left: p.x,
-              top: p.y,
-              child: GestureDetector(
-                onTap: () {
-                  // On ouvre la fiche plante quel que soit canEdit
-                  ref.read(selectedPlantProvider.notifier).state = p;
-
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (_) => PlantDetailsSheet(
-                      plantId: p.id,
-                      gardenId: gardenId,
-                      canEdit: canEdit,
+              left: p.x - diameter / 2,
+              top: p.y - diameter / 2,
+              child: SizedBox(
+                width: diameter,
+                height: diameter,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    /// 🌿 IMAGE AVEC ANIMATION SCALE
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 1, end: isAnimated ? 1.25 : 1),
+                      duration: const Duration(milliseconds: 350),
+                      curve: Curves.elasticOut,
+                      builder: (context, scale, child) {
+                        return Transform.scale(scale: scale, child: child);
+                      },
+                      child: p.imageUrl != null
+                          ? ClipOval(
+                              child: Image.network(
+                                p.imageUrl!,
+                                width: diameter,
+                                height: diameter,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : Icon(
+                              Icons.local_florist,
+                              color: Colors.green,
+                              size: diameter,
+                            ),
                     ),
-                  );
 
-                  print('Tap plant: gardenId=$gardenId, plantId=${p.id}');
-                },
-                child: Icon(
-                  Icons.local_florist,
-                  color: Colors.green,
-                  size: p.diameter ?? 32,
+                    /// 🔴 ZONE TAPPABLE
+                    GestureDetector(
+                      onTap: () {
+                        if (!canEdit) return;
+
+                        /// 1️⃣ déclenche animation
+                        ref.read(animatedPlantProvider.notifier).state = p.id;
+
+                        /// 2️⃣ ouvre la fiche APRÈS un petit délai
+                        Future.delayed(const Duration(milliseconds: 220), () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            builder: (_) => PlantDetailsSheet(
+                              plantId: p.id,
+                              gardenId: gardenId,
+                              canEdit: canEdit,
+                            ),
+                          );
+                        });
+
+                        /// 3️⃣ reset animation
+                        Future.delayed(const Duration(milliseconds: 400), () {
+                          ref.read(animatedPlantProvider.notifier).state = null;
+                        });
+                      },
+                    ),
+                  ],
                 ),
               ),
             );
