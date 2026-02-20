@@ -107,7 +107,7 @@ class PlantDetailsSheet extends ConsumerWidget {
                       children: [
                         const Icon(Icons.straighten),
                         const SizedBox(width: 8),
-                        Text('Diamètre: ${plant.diameter ?? 0} cm'),
+                        Text('Diamètre: ${plant.diameter} cm'),
                         const SizedBox(width: 16),
                         IconButton(
                           icon: const Icon(Icons.center_focus_strong),
@@ -132,7 +132,7 @@ class PlantDetailsSheet extends ConsumerWidget {
                       children: [
                         Text('Récolte: ${plant.harvestType ?? '-'}'),
                         const SizedBox(width: 16),
-                        Text('Strate: ${plant.strate ?? '-'}'),
+                        Text('Strate: ${plant.strate}'),
                       ],
                     ),
                     onTap: canEdit
@@ -223,7 +223,7 @@ class PlantDetailsSheet extends ConsumerWidget {
                     context,
                     canEdit: canEdit,
                     child: Text(
-                      'Planté le: ${plant.plantedAt?.toLocal().toString().split(' ')[0] ?? '-'}',
+                      'Planté le: ${plant.plantedAt.toLocal().toString().split(' ')[0]}',
                     ),
                     onTap: canEdit
                         ? () => _openAddPlantPage(context, plant)

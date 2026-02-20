@@ -11,6 +11,7 @@ class GardenCanvas extends ConsumerWidget {
   final bool canEdit;
 
   const GardenCanvas({
+    super.key,
     required this.gardenId,
     required this.plants,
     required this.canEdit,
@@ -30,8 +31,7 @@ class GardenCanvas extends ConsumerWidget {
         color: Colors.green.shade50,
         child: Stack(
           children: plants.map((p) {
-            final diameter = p.diameter ?? 32;
-            final hitSize = diameter / 1.7;
+            final diameter = p.diameter;
             final animatedId = ref.watch(animatedPlantProvider);
             final isAnimated = animatedId == p.id;
 
