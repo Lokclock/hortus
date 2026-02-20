@@ -7,7 +7,7 @@ class AddPlantState {
   final String? scientificName;
   final String? variety;
   final String? strate; // herb, bush, shrub, tree, vine
-  final String? icon; // symbole sur la carte
+  final String? symbol; // symbole sur la carte
   final DateTime? plantedAt; // date de plantation
   final double? diameter; // diamètre en cm
   final Map<String, DateTimeRange?>?
@@ -19,7 +19,7 @@ class AddPlantState {
     this.scientificName,
     this.variety,
     this.strate,
-    this.icon,
+    this.symbol,
     this.plantedAt,
     this.diameter,
     this.harvestType,
@@ -31,7 +31,7 @@ class AddPlantState {
     String? scientificName,
     String? variety,
     String? strate,
-    String? icon,
+    String? symbol,
     DateTime? plantedAt,
     double? diameter,
     Map<String, DateTimeRange?>? harvestType,
@@ -42,7 +42,7 @@ class AddPlantState {
       scientificName: scientificName ?? this.scientificName,
       variety: variety ?? this.variety,
       strate: strate ?? this.strate,
-      icon: icon ?? this.icon,
+      symbol: symbol ?? this.symbol,
       plantedAt: plantedAt ?? this.plantedAt,
       diameter: diameter ?? this.diameter,
       harvestType: harvestType ?? this.harvestType,

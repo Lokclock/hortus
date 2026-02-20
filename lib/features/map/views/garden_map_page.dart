@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hortus_app/features/map/providers/add_plant_provider.dart';
 import 'package:hortus_app/features/map/providers/garden_permissions_provider.dart';
+import 'package:hortus_app/features/map/providers/map_mode_provider.dart';
 import 'package:hortus_app/features/map/views/add_plant_page.dart';
 import 'package:hortus_app/features/map/views/garden_canvas.dart';
 import 'package:hortus_app/features/map/views/positioning_overlay.dart';
@@ -47,9 +48,11 @@ class GardenMapPage extends ConsumerWidget {
   }
 }
 
-class _TopMapBar extends StatelessWidget {
+class _TopMapBar extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(mapModeProvider);
+    if (mode == MapMode.addPlant) return const SizedBox();
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 8),
@@ -99,6 +102,8 @@ class _BottomMapBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(mapModeProvider);
+    if (mode == MapMode.addPlant) return const SizedBox();
     return Positioned(
       bottom: 20,
       left: 0,
@@ -157,10 +162,7 @@ class _BottomMapBar extends ConsumerWidget {
                           ),
                         ),
                       ),
-                    ).whenComplete(() {
-                      ref.read(addPlantProvider.notifier).state =
-                          const AddPlantState();
-                    });
+                    );
                   },
                 ),
             ],

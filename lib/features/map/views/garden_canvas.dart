@@ -52,14 +52,12 @@ class GardenCanvas extends ConsumerWidget {
                       builder: (context, scale, child) {
                         return Transform.scale(scale: scale, child: child);
                       },
-                      child: p.imageUrl != null
-                          ? ClipOval(
-                              child: Image.network(
-                                p.imageUrl!,
-                                width: diameter,
-                                height: diameter,
-                                fit: BoxFit.cover,
-                              ),
+                      child: (p.symbol.isNotEmpty)
+                          ? Image.asset(
+                              p.symbol!,
+                              width: diameter,
+                              height: diameter,
+                              fit: BoxFit.cover,
                             )
                           : Icon(
                               Icons.local_florist,

@@ -28,8 +28,8 @@ class PositioningOverlay extends ConsumerWidget {
         plantData.name!.isNotEmpty &&
         plantData.strate != null &&
         plantData.strate!.isNotEmpty &&
-        plantData.icon != null &&
-        plantData.icon!.isNotEmpty &&
+        plantData.symbol != null &&
+        plantData.symbol!.isNotEmpty &&
         plantData.diameter != null;
 
     return Stack(
@@ -79,7 +79,7 @@ class PositioningOverlay extends ConsumerWidget {
                         diameter: plantData.diameter!,
                         harvestType: plantData.harvestType ?? {},
                         strate: plantData.strate!,
-                        icon: plantData.icon!,
+                        symbol: plantData.symbol!,
                         plantedAt: plantData.plantedAt ?? DateTime.now(),
                       );
 

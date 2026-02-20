@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hortus_app/features/map/providers/add_plant_provider.dart';
 import 'package:hortus_app/features/map/providers/map_mode_provider.dart';
-import 'package:hortus_app/features/map/providers/map_transform_provider.dart';
 
 class AddPlantPage extends ConsumerStatefulWidget {
   final String gardenId;
@@ -42,8 +41,8 @@ class _AddPlantPageState extends ConsumerState<AddPlantPage> {
         return state.strate != null && state.strate!.isNotEmpty;
 
       case 3:
-        return state.icon != null &&
-            state.icon!.isNotEmpty &&
+        return state.symbol != null &&
+            state.symbol!.isNotEmpty &&
             state.diameter != null;
 
       default:
@@ -76,11 +75,11 @@ class _AddPlantPageState extends ConsumerState<AddPlantPage> {
             child: PageView(
               controller: controller,
               physics: const NeverScrollableScrollPhysics(),
-              children: const [
+              children: [
                 _StepInfo(),
                 _StepHarvest(),
                 _StepStrate(),
-                _StepIconDiameter(),
+                _StepSymbol(),
               ],
             ),
           ),
@@ -371,63 +370,123 @@ class _StepStrate extends ConsumerWidget {
   }
 }
 
-class _StepIconDiameter extends ConsumerWidget {
-  const _StepIconDiameter();
-
-  static const icons = ["🌳", "🌿", "🍓", "🌸", "🌵", "🌱"];
+class _StepSymbol extends ConsumerStatefulWidget {
+  const _StepSymbol({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(addPlantProvider);
+  ConsumerState<_StepSymbol> createState() => _StepSymbolState();
+}
 
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          const Text("Symbole & taille", style: TextStyle(fontSize: 20)),
-          const SizedBox(height: 20),
+class _StepSymbolState extends ConsumerState<_StepSymbol> {
+  // Liste des symboles disponibles
+  final List<String> symbols = [
+    'assets/images/symboles/achillee.png',
+    'assets/images/symboles/baies_aux_cinq_saveurs.png',
+    'assets/images/symboles/camerisier.png',
+    'assets/images/symboles/cassisier.png',
+    'assets/images/symboles/chou_daubenton.png',
+    'assets/images/symboles/consoude.png',
+    'assets/images/symboles/fraisier.png',
+    'assets/images/symboles/kiwai.png',
+    'assets/images/symboles/pommier.png',
+    'assets/images/symboles/robinier_faux-acacia.png',
+    'assets/images/symboles/thym.png',
+    'assets/images/symboles/yuzu.png',
+  ];
 
-          /// icônes
-          Wrap(
-            spacing: 12,
-            children: icons.map((icon) {
-              final selected = state.icon == icon;
+  String? selectedSymbol;
+  double? diameter;
 
-              return GestureDetector(
-                onTap: () => ref.read(addPlantProvider.notifier).state = state
-                    .copyWith(icon: icon),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: selected ? Colors.green.shade50 : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: selected ? Colors.green : Colors.grey,
-                    ),
-                  ),
-                  child: Text(icon, style: const TextStyle(fontSize: 30)),
-                ),
-              );
-            }).toList(),
-          ),
+  @override
+  void initState() {
+    super.initState();
+    final provider = ref.read(addPlantProvider);
+    selectedSymbol = provider.symbol;
+    diameter = provider.diameter;
+  }
 
-          const SizedBox(height: 30),
+  void updateProvider() {
+    ref.read(addPlantProvider.notifier).state = ref
+        .read(addPlantProvider)
+        .copyWith(symbol: selectedSymbol, diameter: diameter);
+  }
 
-          TextField(
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: "Diamètre en cm *",
-              border: OutlineInputBorder(),
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            const Text(
+              'Choisissez un symbole pour votre plante',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
-            onChanged: (v) {
-              final value = double.tryParse(v);
-              ref.read(addPlantProvider.notifier).state = state.copyWith(
-                diameter: value,
-              );
-            },
-          ),
-        ],
+            const SizedBox(height: 16),
+
+            // Grille des symboles
+            Expanded(
+              child: GridView.builder(
+                itemCount: symbols.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemBuilder: (context, index) {
+                  final symbol = symbols[index];
+                  final isSelected = selectedSymbol == symbol;
+
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        selectedSymbol = symbol;
+                        updateProvider();
+                      });
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: isSelected ? Colors.green : Colors.grey,
+                          width: 3,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        color: isSelected
+                            ? Colors.green[100]
+                            : Colors.grey[200],
+                      ),
+                      padding: const EdgeInsets.all(8),
+                      child: Image.asset(symbol),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Champ diamètre
+            TextFormField(
+              initialValue: diameter?.toString(),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'Diamètre (cm)',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (value) {
+                final parsed = double.tryParse(value);
+                setState(() {
+                  diameter = parsed;
+                  updateProvider();
+                });
+              },
+            ),
+
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
     );
   }

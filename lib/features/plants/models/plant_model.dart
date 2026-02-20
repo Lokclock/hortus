@@ -13,7 +13,7 @@ class Plant {
   final double y;
 
   final double diameter;
-  final String icon;
+  final String symbol;
   final String strate;
   final DateTime plantedAt;
 
@@ -31,7 +31,7 @@ class Plant {
     required this.x,
     required this.y,
     required this.diameter,
-    required this.icon,
+    required this.symbol,
     required this.strate,
     required this.plantedAt,
     this.harvestType,
@@ -75,7 +75,7 @@ class Plant {
 
       diameter: (data['diameter'] as num?)?.toDouble() ?? 0,
 
-      icon: data['icon'] ?? "",
+      symbol: data['symbol'] ?? "",
       strate: data['strate'] ?? "",
 
       plantedAt: (data['plantedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -115,7 +115,7 @@ class Plant {
       'x': x,
       'y': y,
       'diameter': diameter,
-      'icon': icon,
+      'symbol': symbol,
       'strate': strate,
       'plantedAt': Timestamp.fromDate(plantedAt),
       'harvestType': harvestMap,
