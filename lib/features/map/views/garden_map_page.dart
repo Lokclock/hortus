@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hortus_app/features/map/providers/add_plant_provider.dart';
 import 'package:hortus_app/features/map/providers/garden_permissions_provider.dart';
 import 'package:hortus_app/features/map/views/add_plant_page.dart';
 import 'package:hortus_app/features/map/views/garden_canvas.dart';
@@ -142,8 +143,24 @@ class _BottomMapBar extends ConsumerWidget {
                     showModalBottomSheet(
                       context: context,
                       isScrollControlled: true,
-                      builder: (_) => AddPlantPage(gardenId: gardenId),
-                    );
+                      builder: (_) => SafeArea(
+                        child: SingleChildScrollView(
+                          padding: EdgeInsets.only(
+                            bottom: MediaQuery.of(context).viewInsets.bottom,
+                          ),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxHeight:
+                                  MediaQuery.of(context).size.height * 0.9,
+                            ),
+                            child: AddPlantPage(gardenId: gardenId),
+                          ),
+                        ),
+                      ),
+                    ).whenComplete(() {
+                      ref.read(addPlantProvider.notifier).state =
+                          const AddPlantState();
+                    });
                   },
                 ),
             ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hortus_app/features/map/providers/add_plant_provider.dart';
 import 'package:hortus_app/features/map/providers/map_mode_provider.dart';
+import 'package:hortus_app/features/map/providers/map_transform_provider.dart';
 
 class AddPlantPage extends ConsumerStatefulWidget {
   final String gardenId;
@@ -13,271 +14,475 @@ class AddPlantPage extends ConsumerStatefulWidget {
 }
 
 class _AddPlantPageState extends ConsumerState<AddPlantPage> {
-  final PageController _pageController = PageController();
+  int step = 0;
+  final controller = PageController();
 
-  // STEP 1
-  final nameCtrl = TextEditingController();
-  final scientificCtrl = TextEditingController();
-  final varietyCtrl = TextEditingController();
-  DateTime plantedAt = DateTime.now();
-
-  // STEP 2
-  final harvestTypes = ['fruit', 'fleur', 'feuille', 'racine', 'bois'];
-  Map<String, DateTimeRange?> selectedHarvests = {};
-
-  // STEP 3
-  final strates = ['herb', 'bush', 'shrub', 'tree', 'vine'];
-  String? selectedStrate;
-
-  // STEP 4
-  final icons = ['🌱', '🌿', '🌳', '🌷', '🍎'];
-  String? selectedIcon;
-  final diameterCtrl = TextEditingController();
-
-  int currentStep = 0;
-
-  void _nextStep() {
-    if (!_validateCurrentStep()) return;
-
-    if (currentStep < 3) {
-      setState(() => currentStep++);
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    } else {
-      // Passer au PositioningOverlay
-      ref.read(addPlantProvider.notifier).state = AddPlantState(
-        name: nameCtrl.text,
-        scientificName: scientificCtrl.text,
-        variety: varietyCtrl.text,
-        plantedAt: plantedAt,
-        harvestType: selectedHarvests,
-        strate: selectedStrate!,
-        icon: selectedIcon!,
-        diameter: double.parse(diameterCtrl.text),
-      );
-
-      // Activer le mode positionnement
-      ref.read(mapModeProvider.notifier).state = MapMode.edit;
-
-      // Fermer la page AddPlant
-      Navigator.of(context).pop();
-    }
+  void next() {
+    controller.nextPage(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.ease,
+    );
+    setState(() => step++);
   }
 
-  bool _validateCurrentStep() {
-    switch (currentStep) {
+  void back() {
+    controller.previousPage(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.ease,
+    );
+    setState(() => step--);
+  }
+
+  bool canProceed(AddPlantState state) {
+    switch (step) {
       case 0:
-        if (nameCtrl.text.isEmpty) {
-          _showError("Le nom commun est obligatoire");
-          return false;
-        }
-        return true;
+        return state.name != null && state.name!.trim().isNotEmpty;
+
       case 2:
-        if (selectedStrate == null) {
-          _showError("Veuillez sélectionner une strate");
-          return false;
-        }
-        return true;
+        return state.strate != null && state.strate!.isNotEmpty;
+
       case 3:
-        if (selectedIcon == null || diameterCtrl.text.isEmpty) {
-          _showError("Veuillez choisir un symbole et entrer le diamètre");
-          return false;
-        }
-        return true;
+        return state.icon != null &&
+            state.icon!.isNotEmpty &&
+            state.diameter != null;
+
       default:
         return true;
     }
   }
 
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(addPlantProvider);
+    final valid = canProceed(state);
+
     return Scaffold(
-      appBar: AppBar(title: Text("Ajouter une plante")),
-      body: PageView(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
-        children: [_buildStep1(), _buildStep2(), _buildStep3(), _buildStep4()],
-      ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ElevatedButton(
-          onPressed: _nextStep,
-          child: Text(currentStep < 3 ? "Suivant" : "Terminer"),
+      appBar: AppBar(
+        title: const Text("Ajouter une plante"),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () {
+            ref.read(addPlantProvider.notifier).state = const AddPlantState();
+            Navigator.of(context).pop();
+          },
         ),
       ),
-    );
-  }
-
-  // -------------------- STEP 1 --------------------
-  Widget _buildStep1() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          TextField(
-            controller: nameCtrl,
-            decoration: const InputDecoration(labelText: "Nom commun *"),
-          ),
-          TextField(
-            controller: scientificCtrl,
-            decoration: const InputDecoration(labelText: "Nom scientifique"),
-          ),
-          TextField(
-            controller: varietyCtrl,
-            decoration: const InputDecoration(labelText: "Variété"),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              const Text("Planté le : "),
-              TextButton(
-                onPressed: () async {
-                  final date = await showDatePicker(
-                    context: context,
-                    initialDate: plantedAt,
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                  );
-                  if (date != null) setState(() => plantedAt = date);
-                },
-                child: Text(
-                  "${plantedAt.day}/${plantedAt.month}/${plantedAt.year}",
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+          LinearProgressIndicator(value: (step + 1) / 4),
 
-  // -------------------- STEP 2 --------------------
-  Widget _buildStep2() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          /// Liste de récoltes
-          Column(
-            children: harvestTypes.map((type) {
-              final selected = selectedHarvests.containsKey(type);
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    if (selected) {
-                      selectedHarvests.remove(type);
-                    } else {
-                      selectedHarvests[type] = null;
-                    }
-                  });
-                },
-                child: Container(
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: selected ? Colors.green : Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(child: Text(type)),
-                ),
-              );
-            }).toList(),
-          ),
-
-          const SizedBox(width: 16),
-
-          /// Sélection de période
           Expanded(
-            child: Column(
-              children: selectedHarvests.keys.map((type) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Période $type :"),
-                    TextButton(
-                      onPressed: () async {
-                        final range = await showDateRangePicker(
-                          context: context,
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                        );
-                        if (range != null) {
-                          setState(() => selectedHarvests[type] = range);
+            child: PageView(
+              controller: controller,
+              physics: const NeverScrollableScrollPhysics(),
+              children: const [
+                _StepInfo(),
+                _StepHarvest(),
+                _StepStrate(),
+                _StepIconDiameter(),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                if (step > 0)
+                  ElevatedButton(onPressed: back, child: const Text("Retour")),
+                const Spacer(),
+                ElevatedButton(
+                  onPressed: valid
+                      ? () {
+                          if (step == 3) {
+                            ref.read(mapModeProvider.notifier).state =
+                                MapMode.addPlant;
+                            Navigator.pop(context);
+                          } else {
+                            next();
+                          }
                         }
-                      },
-                      child: Text(
-                        selectedHarvests[type] != null
-                            ? "${selectedHarvests[type]!.start.day}/${selectedHarvests[type]!.start.month} - ${selectedHarvests[type]!.end.day}/${selectedHarvests[type]!.end.month}"
-                            : "Non précisée",
-                      ),
-                    ),
-                  ],
-                );
-              }).toList(),
+                      : null,
+                  child: Text(step == 3 ? "Positionner" : "Suivant"),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  // -------------------- STEP 3 --------------------
-  Widget _buildStep3() {
+class _StepInfo extends ConsumerWidget {
+  const _StepInfo();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(addPlantProvider);
+    final plantedDate = state.plantedAt ?? DateTime.now();
+
     return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: strates.map((s) {
-          final selected = selectedStrate == s;
-          return ListTile(
-            title: Text(s),
-            tileColor: selected ? Colors.green.shade200 : null,
-            onTap: () => setState(() => selectedStrate = s),
+      padding: const EdgeInsets.all(24),
+      child: ListView(
+        children: [
+          const Text("Informations", style: TextStyle(fontSize: 20)),
+
+          const SizedBox(height: 20),
+
+          TextField(
+            decoration: const InputDecoration(
+              labelText: "Nom commun *",
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (v) => ref.read(addPlantProvider.notifier).state = state
+                .copyWith(name: v),
+          ),
+
+          const SizedBox(height: 16),
+
+          TextField(
+            decoration: const InputDecoration(
+              labelText: "Nom scientifique",
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (v) => ref.read(addPlantProvider.notifier).state = state
+                .copyWith(scientificName: v),
+          ),
+
+          const SizedBox(height: 16),
+
+          TextField(
+            decoration: const InputDecoration(
+              labelText: "Variété",
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (v) => ref.read(addPlantProvider.notifier).state = state
+                .copyWith(variety: v),
+          ),
+
+          const SizedBox(height: 24),
+
+          InkWell(
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: plantedDate,
+                firstDate: DateTime(1900),
+                lastDate: DateTime.now(),
+              );
+              if (picked != null) {
+                ref.read(addPlantProvider.notifier).state = state.copyWith(
+                  plantedAt: picked,
+                );
+              }
+            },
+            child: ListTile(
+              leading: const Icon(Icons.calendar_today),
+              title: Text(
+                "${plantedDate.day}/${plantedDate.month}/${plantedDate.year}",
+              ),
+              titleTextStyle: const TextStyle(
+                fontSize: 16,
+                color: Colors.black,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepHarvest extends ConsumerStatefulWidget {
+  const _StepHarvest({super.key});
+
+  @override
+  ConsumerState<_StepHarvest> createState() => _StepHarvestState();
+}
+
+class _StepHarvestState extends ConsumerState<_StepHarvest> {
+  // Liste des types de récoltes avec leur image
+  final Map<String, String> harvestImages = {
+    'fruit': 'assets/images/recoltes/fruit.png',
+    'fleur': 'assets/images/recoltes/fleur.png',
+    'feuille': 'assets/images/recoltes/feuille.png',
+    'racine': 'assets/images/recoltes/racine.png',
+    'bois': 'assets/images/recoltes/bois.png',
+  };
+
+  // état local pour ce step
+  late Map<String, DateTimeRange?> localHarvests;
+
+  @override
+  void initState() {
+    super.initState();
+    final providerValue = ref.read(addPlantProvider);
+    localHarvests = Map<String, DateTimeRange?>.from(
+      providerValue.harvestType ?? {},
+    ); // récup si existant
+  }
+
+  // update le provider à chaque changement
+  void updateProvider() {
+    ref.read(addPlantProvider.notifier).state = ref
+        .read(addPlantProvider)
+        .copyWith(harvestType: localHarvests);
+  }
+
+  Future<void> pickDateRange(String type) async {
+    final now = DateTime.now();
+    final initialRange =
+        localHarvests[type] ??
+        DateTimeRange(start: now, end: now.add(const Duration(days: 7)));
+
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 2),
+      lastDate: DateTime(now.year + 5),
+      initialDateRange: initialRange,
+    );
+
+    if (picked != null) {
+      setState(() {
+        localHarvests[type] = picked;
+        updateProvider();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: harvestImages.length,
+      itemBuilder: (context, index) {
+        final type = harvestImages.keys.elementAt(index);
+        final image = harvestImages[type]!;
+        final isSelected = localHarvests.containsKey(type);
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Image + tile
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (isSelected) {
+                      localHarvests.remove(type);
+                    } else {
+                      localHarvests[type] = null; // active mais pas de période
+                    }
+                    updateProvider();
+                  });
+                },
+                child: Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.green[200] : Colors.grey[200],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? Colors.green : Colors.grey,
+                      width: 2,
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(8),
+                  child: Image.asset(image),
+                ),
+              ),
+
+              const SizedBox(width: 16),
+
+              // zone de période si sélectionné
+              Expanded(
+                child: isSelected
+                    ? GestureDetector(
+                        onTap: () => pickDateRange(type),
+                        child: Container(
+                          height: 70,
+                          alignment: Alignment.centerLeft,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.green[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.green.shade200,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Text(
+                            localHarvests[type] != null
+                                ? 'Période : ${localHarvests[type]!.start.day}/${localHarvests[type]!.start.month} - ${localHarvests[type]!.end.day}/${localHarvests[type]!.end.month}'
+                                : 'Période : .../... - .../...',
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      )
+                    : const SizedBox(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StepStrate extends ConsumerWidget {
+  const _StepStrate();
+
+  static const assets = {
+    'herb': 'assets/images/strates/herb.png',
+    'bush': 'assets/images/strates/bush.png',
+    'shrub': 'assets/images/strates/canopee.png',
+    'tree': 'assets/images/strates/tree.png',
+    'vine': 'assets/images/strates/vine.png',
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(addPlantProvider);
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: GridView.count(
+        crossAxisCount: 3,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        children: assets.entries.map((e) {
+          final selected = state.strate == e.key;
+
+          return _AnimatedTile(
+            asset: e.value,
+            label: e.key,
+            selected: selected,
+            onTap: () {
+              ref.read(addPlantProvider.notifier).state = state.copyWith(
+                strate: e.key,
+              );
+            },
           );
         }).toList(),
       ),
     );
   }
+}
 
-  // -------------------- STEP 4 --------------------
-  Widget _buildStep4() {
+class _StepIconDiameter extends ConsumerWidget {
+  const _StepIconDiameter();
+
+  static const icons = ["🌳", "🌿", "🍓", "🌸", "🌵", "🌱"];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(addPlantProvider);
+
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          GridView.count(
-            crossAxisCount: 5,
-            shrinkWrap: true,
-            children: icons.map((i) {
-              final selected = selectedIcon == i;
+          const Text("Symbole & taille", style: TextStyle(fontSize: 20)),
+          const SizedBox(height: 20),
+
+          /// icônes
+          Wrap(
+            spacing: 12,
+            children: icons.map((icon) {
+              final selected = state.icon == icon;
+
               return GestureDetector(
-                onTap: () => setState(() => selectedIcon = i),
-                child: Container(
-                  margin: const EdgeInsets.all(4),
+                onTap: () => ref.read(addPlantProvider.notifier).state = state
+                    .copyWith(icon: icon),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: selected ? Colors.green : Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(8),
+                    color: selected ? Colors.green.shade50 : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: selected ? Colors.green : Colors.grey,
+                    ),
                   ),
-                  child: Center(
-                    child: Text(i, style: const TextStyle(fontSize: 24)),
-                  ),
+                  child: Text(icon, style: const TextStyle(fontSize: 30)),
                 ),
               );
             }).toList(),
           ),
-          const SizedBox(height: 16),
+
+          const SizedBox(height: 30),
+
           TextField(
-            controller: diameterCtrl,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: "Diamètre (cm) *"),
+            decoration: const InputDecoration(
+              labelText: "Diamètre en cm *",
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (v) {
+              final value = double.tryParse(v);
+              ref.read(addPlantProvider.notifier).state = state.copyWith(
+                diameter: value,
+              );
+            },
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AnimatedTile extends StatelessWidget {
+  final String asset;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _AnimatedTile({
+    required this.asset,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: selected ? Colors.green.shade50 : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? Colors.green : Colors.grey.shade300,
+            width: 2,
+          ),
+          boxShadow: [
+            if (selected)
+              BoxShadow(
+                color: Colors.green.withOpacity(.2),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Expanded(child: Image.asset(asset)),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.green : Colors.black87,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:hortus_app/core/utils/map_math.dart';
 import 'package:hortus_app/features/map/providers/add_plant_provider.dart';
 import 'package:hortus_app/features/map/providers/map_transform_provider.dart';
 import 'package:hortus_app/features/map/widgets/crosshair.dart';
+import 'package:hortus_app/features/map/widgets/diameter_preview.dart';
 import 'package:hortus_app/features/plants/models/plant_model.dart';
 import 'package:hortus_app/features/plants/providers/plant_providers.dart';
 import '../providers/map_mode_provider.dart';
@@ -39,6 +40,8 @@ class PositioningOverlay extends ConsumerWidget {
           child: Container(color: Colors.black.withOpacity(0.1)),
         ),
 
+        const DiameterPreview(),
+
         // Viseur centré
         const Center(child: Crosshair()),
 
@@ -69,6 +72,8 @@ class PositioningOverlay extends ConsumerWidget {
                         id: plantData.id ?? "",
                         gardenId: gardenId,
                         name: plantData.name!,
+                        scientificName: plantData.scientificName,
+                        variety: plantData.variety,
                         x: pos.dx,
                         y: pos.dy,
                         diameter: plantData.diameter!,

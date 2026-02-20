@@ -17,3 +17,11 @@ Offset getWorldPosition({
 
   return transformed;
 }
+
+double worldCmToScreenPx({
+  required TransformationController controller,
+  required double cm,
+}) {
+  final scale = controller.value.getMaxScaleOnAxis();
+  return cm * scale;
+}
