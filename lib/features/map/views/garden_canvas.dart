@@ -79,6 +79,7 @@ class GardenCanvas extends ConsumerWidget {
                           showModalBottomSheet(
                             context: context,
                             isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
                             builder: (_) => PlantDetailsSheet(
                               plantId: p.id,
                               gardenId: gardenId,

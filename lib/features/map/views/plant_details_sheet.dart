@@ -35,163 +35,226 @@ class PlantDetailsSheet extends ConsumerWidget {
             controller: scrollController,
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 🌸 IMAGE PRINCIPALE
-                  _buildEditableContainer(
-                    context,
-                    canEdit: canEdit,
-                    child: Center(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: plant.imageUrl != null
-                            ? Image.network(
-                                plant.imageUrl!,
-                                width: 150,
-                                height: 150,
-                                fit: BoxFit.cover,
-                              )
-                            : Container(
-                                width: 150,
-                                height: 150,
-                                color: Colors.green.shade100,
-                                child: const Icon(
-                                  Icons.local_florist,
-                                  size: 64,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white, // ton vrai fond
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(16),
+                    bottom: Radius.circular(16),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 🔹 IMAGE + NOM / SCIENTIFIQUE / VARIÉTÉ
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Image principale
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: plant.imageUrl != null
+                                ? Image.network(
+                                    plant.imageUrl!,
+                                    width: 120,
+                                    height: 120,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Container(
+                                    width: 120,
+                                    height: 120,
+                                    color: Colors.green.shade100,
+                                    child: const Icon(
+                                      Icons.local_florist,
+                                      size: 64,
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Nom / scientifique / variété
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  plant.name,
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (plant.scientificName != null)
+                                  Text(
+                                    plant.scientificName!,
+                                    style: const TextStyle(
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                if (plant.variety != null) Text(plant.variety!),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // 🔹 SYMBOLE + DIAMÈTRE + DRAPEAU
+                      Container(
+                        padding: const EdgeInsets.only(
+                          left: 12,
+                          top: 4,
+                          bottom: 4,
+                          right: 20,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Symbole
+                            plant.symbol != null
+                                ? Image.asset(
+                                    plant.symbol!,
+                                    width: 80,
+                                    height: 80,
+                                  )
+                                : const SizedBox(width: 40, height: 40),
+
+                            // Diamètre
+                            Text('${plant.diameter} cm'),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              height: 88,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: IconButton(
+                                icon: const Icon(Icons.place),
+                                onPressed: () {
+                                  // TODO: localiser sur la carte
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // 🔹 RÉCOLTES + STRATE
+                      Container(
+                        width: double.infinity,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.only(
+                                  left: 6,
+                                  right: 12,
+                                  top: 8,
+                                  bottom: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  children: [
+                                    // Récoltes (max 5)
+                                    Expanded(
+                                      child: Row(
+                                        children: List.generate(5, (i) {
+                                          if (i <
+                                              (plant.harvestType?.length ??
+                                                  0)) {
+                                            final type = plant.harvestType!.keys
+                                                .elementAt(i);
+                                            final imgPath =
+                                                'assets/images/recoltes/$type.png';
+                                            return Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 4,
+                                                  ),
+                                              child: Image.asset(
+                                                imgPath,
+                                                width: 40,
+                                                height: 40,
+                                              ),
+                                            );
+                                          }
+                                          return const SizedBox(
+                                            width: 30,
+                                            height: 30,
+                                          );
+                                        }),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                      ),
-                    ),
-                    onTap: canEdit
-                        ? () => _openAddPlantPage(context, plant)
-                        : null,
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // 🌱 NOM, SCIENTIFIQUE, VARIÉTÉ
-                  _buildEditableContainer(
-                    context,
-                    canEdit: canEdit,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          plant.name,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        if (plant.scientificName != null)
-                          Text(
-                            plant.scientificName!,
-                            style: const TextStyle(fontStyle: FontStyle.italic),
-                          ),
-                        if (plant.variety != null) Text(plant.variety!),
-                      ],
-                    ),
-                    onTap: canEdit
-                        ? () => _openAddPlantPage(context, plant)
-                        : null,
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Diamètre + recentrer
-                  _buildEditableContainer(
-                    context,
-                    canEdit: canEdit,
-                    child: Row(
-                      children: [
-                        const Icon(Icons.straighten),
-                        const SizedBox(width: 8),
-                        Text('Diamètre: ${plant.diameter} cm'),
-                        const SizedBox(width: 16),
-                        IconButton(
-                          icon: const Icon(Icons.center_focus_strong),
-                          onPressed: () {
-                            // TODO: recentrer sur la carte
-                          },
-                        ),
-                      ],
-                    ),
-                    onTap: canEdit
-                        ? () => _openAddPlantPage(context, plant)
-                        : null,
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Récolte et Strate
-                  _buildEditableContainer(
-                    context,
-                    canEdit: canEdit,
-                    child: Row(
-                      children: [
-                        Text('Récolte: ${plant.harvestType ?? '-'}'),
-                        const SizedBox(width: 16),
-                        Text('Strate: ${plant.strate}'),
-                      ],
-                    ),
-                    onTap: canEdit
-                        ? () => _openAddPlantPage(context, plant)
-                        : null,
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Observations
-                  _buildEditableContainer(
-                    context,
-                    canEdit: canEdit,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Observations',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        ...plant.observations?.map((obs) {
-                              final date = obs['date'] as Timestamp?;
-                              return ListTile(
-                                title: Text(obs['text'] ?? ''),
-                                subtitle: Text(
-                                  date != null
-                                      ? date.toDate().toLocal().toString()
-                                      : '',
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 12),
+                              child: Container(
+                                padding: const EdgeInsets.only(
+                                  left: 6,
+                                  right: 12,
+                                  top: 8,
+                                  bottom: 8,
                                 ),
-                              );
-                            }).toList() ??
-                            [const Text('Aucune observation')],
-                      ],
-                    ),
-                    onTap: canEdit
-                        ? () => _openAddPlantPage(context, plant)
-                        : null,
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Galerie
-                  _buildEditableContainer(
-                    context,
-                    canEdit: canEdit,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Galerie',
-                          style: Theme.of(context).textTheme.titleMedium,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Image.asset(
+                                  'assets/images/strates/${plant.strate}.png',
+                                  width: 40,
+                                  height: 40,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 4),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // 🔹 OBSERVATIONS
+                      InkWell(
+                        onTap: () {
+                          // TODO: ouvrir page type chat pour observations
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            plant.observations?.isNotEmpty == true
+                                ? 'Observations (${plant.observations!.length})'
+                                : 'Aucune observation',
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // 🔹 GALERIE
+                      if ((plant.images?.isNotEmpty ?? false))
                         SizedBox(
                           height: 100,
                           child: ListView.builder(
                             scrollDirection: Axis.horizontal,
-                            itemCount: plant.images?.length ?? 0,
+                            itemCount: plant.images!.length,
                             itemBuilder: (context, i) {
                               final img = plant.images![i];
                               return Padding(
@@ -209,66 +272,42 @@ class PlantDetailsSheet extends ConsumerWidget {
                             },
                           ),
                         ),
-                      ],
-                    ),
-                    onTap: canEdit
-                        ? () => _openAddPlantPage(context, plant)
-                        : null,
-                  ),
 
-                  const SizedBox(height: 12),
+                      const SizedBox(height: 12),
 
-                  // Date plantation
-                  _buildEditableContainer(
-                    context,
-                    canEdit: canEdit,
-                    child: Text(
-                      'Planté le: ${plant.plantedAt.toLocal().toString().split(' ')[0]}',
-                    ),
-                    onTap: canEdit
-                        ? () => _openAddPlantPage(context, plant)
-                        : null,
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Bouton Déplacer
-                  if (canEdit)
-                    Center(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _openAddPlantPage(context, plant),
-                        icon: const Icon(Icons.open_with),
-                        label: const Text('Déplacer / Modifier'),
+                      // 🔹 DATE PLANTATION
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'Planté le: ${plant.plantedAt.toLocal().toString().split(' ')[0]}',
+                        ),
                       ),
-                    ),
 
-                  const SizedBox(height: 24),
-                ],
+                      const SizedBox(height: 12),
+
+                      // 🔹 BOUTON DÉPLACER
+                      if (canEdit)
+                        Center(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _openAddPlantPage(context, plant),
+                            icon: const Icon(Icons.open_with),
+                            label: const Text('Déplacer / Modifier'),
+                          ),
+                        ),
+
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
         );
       },
-    );
-  }
-
-  /// Widget générique pour chaque bloc éditable
-  Widget _buildEditableContainer(
-    BuildContext context, {
-    required Widget child,
-    required bool canEdit,
-    VoidCallback? onTap,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12),
-        border: canEdit ? Border.all(color: Colors.green.shade300) : null,
-      ),
-      child: InkWell(onTap: canEdit ? onTap : null, child: child),
     );
   }
 
