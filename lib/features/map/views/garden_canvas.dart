@@ -54,7 +54,7 @@ class GardenCanvas extends ConsumerWidget {
                       },
                       child: (p.symbol.isNotEmpty)
                           ? Image.asset(
-                              p.symbol!,
+                              p.symbol,
                               width: diameter,
                               height: diameter,
                               fit: BoxFit.cover,

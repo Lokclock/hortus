@@ -162,7 +162,14 @@ class _BottomMapBar extends ConsumerWidget {
                           ),
                         ),
                       ),
-                    );
+                    ).whenComplete(() {
+                      // Si le mode n'est pas addPlant, c'est que l'utilisateur a quitté avant de finir
+                      final mode = ref.read(mapModeProvider);
+                      if (mode != MapMode.addPlant) {
+                        ref.read(addPlantProvider.notifier).state =
+                            const AddPlantState();
+                      }
+                    });
                   },
                 ),
             ],

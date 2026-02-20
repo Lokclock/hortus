@@ -55,70 +55,102 @@ class _AddPlantPageState extends ConsumerState<AddPlantPage> {
     final state = ref.watch(addPlantProvider);
     final valid = canProceed(state);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Ajouter une plante"),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () {
-            ref.read(addPlantProvider.notifier).state = const AddPlantState();
-            Navigator.of(context).pop();
-          },
-        ),
-      ),
-      body: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          LinearProgressIndicator(value: (step + 1) / 4),
+    return GestureDetector(
+      behavior: HitTestBehavior
+          .opaque, // capture tous les taps même sur les zones vides
+      onTap: () {
+        // perd le focus de n'importe quel TextField ouvert
+        FocusScope.of(context).unfocus();
+      },
+      child: Scaffold(
+        body: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            LinearProgressIndicator(value: (step + 1) / 4),
 
-          Expanded(
-            child: PageView(
-              controller: controller,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _StepInfo(),
-                _StepHarvest(),
-                _StepStrate(),
-                _StepSymbol(),
-              ],
+            Expanded(
+              child: PageView(
+                controller: controller,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _StepInfo(),
+                  _StepHarvest(),
+                  _StepStrate(),
+                  _StepSymbol(),
+                ],
+              ),
             ),
-          ),
 
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                if (step > 0)
-                  ElevatedButton(onPressed: back, child: const Text("Retour")),
-                const Spacer(),
-                ElevatedButton(
-                  onPressed: valid
-                      ? () {
-                          if (step == 3) {
-                            ref.read(mapModeProvider.notifier).state =
-                                MapMode.addPlant;
-                            Navigator.pop(context);
-                          } else {
-                            next();
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  if (step > 0)
+                    ElevatedButton(
+                      onPressed: back,
+                      child: const Text("Retour"),
+                    ),
+                  const Spacer(),
+                  ElevatedButton(
+                    onPressed: valid
+                        ? () {
+                            FocusScope.of(context).unfocus();
+                            if (step == 3) {
+                              ref.read(mapModeProvider.notifier).state =
+                                  MapMode.addPlant;
+                              Navigator.pop(context);
+                            } else {
+                              next();
+                            }
                           }
-                        }
-                      : null,
-                  child: Text(step == 3 ? "Positionner" : "Suivant"),
-                ),
-              ],
+                        : null,
+                    child: Text(step == 3 ? "Positionner" : "Suivant"),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _StepInfo extends ConsumerWidget {
-  const _StepInfo();
+class _StepInfo extends ConsumerStatefulWidget {
+  const _StepInfo({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_StepInfo> createState() => _StepInfoState();
+}
+
+class _StepInfoState extends ConsumerState<_StepInfo> {
+  late TextEditingController nameController;
+  late TextEditingController scientificController;
+  late TextEditingController varietyController;
+
+  @override
+  void initState() {
+    super.initState();
+    final state = ref.read(addPlantProvider);
+
+    // Initialise les controllers avec les valeurs actuelles du provider
+    nameController = TextEditingController(text: state.name ?? '');
+    scientificController = TextEditingController(
+      text: state.scientificName ?? '',
+    );
+    varietyController = TextEditingController(text: state.variety ?? '');
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    scientificController.dispose();
+    varietyController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(addPlantProvider);
     final plantedDate = state.plantedAt ?? DateTime.now();
 
@@ -126,43 +158,57 @@ class _StepInfo extends ConsumerWidget {
       padding: const EdgeInsets.all(24),
       child: ListView(
         children: [
-          const Text("Informations", style: TextStyle(fontSize: 20)),
-
           const SizedBox(height: 20),
 
+          // Nom commun *
           TextField(
+            controller: nameController,
             decoration: const InputDecoration(
               labelText: "Nom commun *",
               border: OutlineInputBorder(),
             ),
-            onChanged: (v) => ref.read(addPlantProvider.notifier).state = state
-                .copyWith(name: v),
+            onChanged: (v) {
+              ref.read(addPlantProvider.notifier).state = state.copyWith(
+                name: v,
+              );
+            },
           ),
 
           const SizedBox(height: 16),
 
+          // Nom scientifique
           TextField(
+            controller: scientificController,
             decoration: const InputDecoration(
               labelText: "Nom scientifique",
               border: OutlineInputBorder(),
             ),
-            onChanged: (v) => ref.read(addPlantProvider.notifier).state = state
-                .copyWith(scientificName: v),
+            onChanged: (v) {
+              ref.read(addPlantProvider.notifier).state = state.copyWith(
+                scientificName: v,
+              );
+            },
           ),
 
           const SizedBox(height: 16),
 
+          // Variété
           TextField(
+            controller: varietyController,
             decoration: const InputDecoration(
               labelText: "Variété",
               border: OutlineInputBorder(),
             ),
-            onChanged: (v) => ref.read(addPlantProvider.notifier).state = state
-                .copyWith(variety: v),
+            onChanged: (v) {
+              ref.read(addPlantProvider.notifier).state = state.copyWith(
+                variety: v,
+              );
+            },
           ),
 
           const SizedBox(height: 24),
 
+          // Date de plantation
           InkWell(
             onTap: () async {
               final picked = await showDatePicker(
@@ -180,7 +226,7 @@ class _StepInfo extends ConsumerWidget {
             child: ListTile(
               leading: const Icon(Icons.calendar_today),
               title: Text(
-                "${plantedDate.day}/${plantedDate.month}/${plantedDate.year}",
+                "Date de plantation : ${plantedDate.day}/${plantedDate.month}/${plantedDate.year}",
               ),
               titleTextStyle: const TextStyle(
                 fontSize: 16,
