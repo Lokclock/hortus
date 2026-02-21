@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hortus_app/core/widgets/app_list_tile.dart';
+import 'package:hortus_app/features/auth/providers/auth_providers.dart';
 import 'package:hortus_app/features/gardens/models/garden_model.dart';
 import 'package:hortus_app/features/gardens/providers/garden_providers.dart';
 
@@ -13,39 +15,54 @@ class GardensPage extends ConsumerStatefulWidget {
 
 class _GardensPageState extends ConsumerState<GardensPage> {
   int selectedFilter = 0;
-
   final filters = ["Tous", "Mes jardins", "Publics"];
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final gardensAsync = ref.watch(accessibleGardensProvider);
+    final currentUserId = ref.watch(currentUserProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Mes jardins")),
+      appBar: AppBar(
+        leading: const SizedBox(width: 0, height: 0),
+        title: Text(
+          "H o r t u s",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.primaryColor,
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+      ),
+
       body: Column(
         children: [
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-          /// FILTRES
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(filters.length, (index) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: ChoiceChip(
+          /// 🌿 FILTRES PREMIUM
+          SizedBox(
+            height: 44,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              scrollDirection: Axis.horizontal,
+              itemBuilder: (_, index) {
+                final selected = selectedFilter == index;
+
+                return ChoiceChip(
                   label: Text(filters[index]),
-                  selected: selectedFilter == index,
-                  onSelected: (_) {
-                    setState(() => selectedFilter = index);
-                  },
-                ),
-              );
-            }),
+                  selected: selected,
+                  onSelected: (_) => setState(() => selectedFilter = index),
+                );
+              },
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemCount: filters.length,
+            ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          /// LISTE FIRESTORE
+          /// 🌿 LISTE
           Expanded(
             child: gardensAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -53,11 +70,12 @@ class _GardensPageState extends ConsumerState<GardensPage> {
               error: (e, _) => Center(child: Text("Erreur : $e")),
 
               data: (gardens) {
-                /// 🔹 Appliquer filtre UI
                 List<Garden> filtered = gardens;
 
-                if (selectedFilter == 1) {
-                  filtered = gardens.where((g) => !g.isPublic).toList();
+                if (selectedFilter == 1 && currentUserId != null) {
+                  filtered = gardens
+                      .where((g) => g.ownerId == currentUserId)
+                      .toList();
                 } else if (selectedFilter == 2) {
                   filtered = gardens.where((g) => g.isPublic).toList();
                 }
@@ -66,25 +84,19 @@ class _GardensPageState extends ConsumerState<GardensPage> {
                   return const Center(child: Text("Aucun jardin 🌱"));
                 }
 
-                return ListView.builder(
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
                   itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (_, i) {
                     final garden = filtered[i];
 
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      child: ListTile(
-                        leading: const Icon(Icons.park),
-                        title: Text(garden.name),
-                        subtitle: Text("${garden.width}m x ${garden.height}m"),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () {
-                          context.go('/garden/${garden.id}');
-                        },
-                      ),
+                    return AppListTile(
+                      leading: const Icon(Icons.park),
+                      title: garden.name,
+                      subtitle: "par ${garden.ownerUsername ?? "Inconnu"}",
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => context.go('/garden/${garden.id}'),
                     );
                   },
                 );

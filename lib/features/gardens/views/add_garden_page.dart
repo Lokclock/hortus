@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hortus_app/core/services/firebase_providers.dart';
+import 'package:hortus_app/features/auth/providers/auth_providers.dart';
 import 'package:hortus_app/features/gardens/providers/garden_providers.dart';
 
 class AddGardenPage extends ConsumerStatefulWidget {
@@ -15,7 +17,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
 
   final nameCtrl = TextEditingController();
   final widthCtrl = TextEditingController();
-  final heightCtrl = TextEditingController();
+  final lengthCtrl = TextEditingController();
 
   bool isPublic = false;
   bool isEditable = false;
@@ -26,83 +28,123 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
 
     setState(() => loading = true);
 
-    await ref
-        .read(gardenRepoProvider)
-        .createGarden(
-          name: nameCtrl.text.trim(),
-          width: double.parse(widthCtrl.text),
-          height: double.parse(heightCtrl.text),
-          isPublic: isPublic,
-          isEditable: isPublic ? isEditable : false,
-        );
+    try {
+      // 🔹 Récupérer l'utilisateur courant
+      final uid = ref.read(currentUserProvider);
+      if (uid == null) throw Exception("Utilisateur non connecté");
 
-    if (mounted) context.push('/home');
+      // 🔹 Récupérer le username depuis Firestore
+      final userDoc = await ref
+          .read(firestoreProvider)
+          .collection('users')
+          .doc(uid)
+          .get();
+
+      final username = userDoc.data()?['username'] ?? 'inconnu';
+
+      // 🔹 Créer le garden avec ownerUsername
+      await ref
+          .read(gardenRepoProvider)
+          .createGarden(
+            name: nameCtrl.text.trim(),
+            width: double.parse(widthCtrl.text),
+            length: double.parse(lengthCtrl.text),
+            isPublic: isPublic,
+            isEditable: isPublic ? isEditable : false,
+            ownerUsername: username,
+          );
+
+      if (mounted) context.push('/home');
+    } catch (e) {
+      setState(() => loading = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Créer un jardin")),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
+    final theme = Theme.of(context);
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
         child: Form(
           key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: "Nom du jardin"),
-                validator: (v) => v == null || v.isEmpty ? "Obligatoire" : null,
-              ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text("Créer un jardin", style: theme.textTheme.headlineSmall),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 24),
 
-              TextFormField(
-                controller: widthCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "Largeur (m)"),
-                validator: (v) => v == null || v.isEmpty ? "Obligatoire" : null,
-              ),
+                TextFormField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: "Nom du jardin"),
+                  validator: (v) =>
+                      v == null || v.isEmpty ? "Obligatoire" : null,
+                ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              TextFormField(
-                controller: heightCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "Hauteur (m)"),
-                validator: (v) => v == null || v.isEmpty ? "Obligatoire" : null,
-              ),
+                TextFormField(
+                  controller: widthCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: "Largeur (m)"),
+                  validator: (v) =>
+                      v == null || v.isEmpty ? "Obligatoire" : null,
+                ),
 
-              const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
-              /// PUBLIC SWITCH
-              SwitchListTile(
-                title: const Text("Jardin public"),
-                value: isPublic,
-                onChanged: (v) => setState(() => isPublic = v),
-              ),
+                TextFormField(
+                  controller: lengthCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: "Longueur (m)"),
+                  validator: (v) =>
+                      v == null || v.isEmpty ? "Obligatoire" : null,
+                ),
 
-              /// OPTION EDITABLE (visible seulement si public)
-              if (isPublic)
+                const SizedBox(height: 20),
+
                 SwitchListTile(
-                  title: const Text("Modifiable par tous"),
-                  subtitle: const Text("Sinon lecture seule"),
-                  value: isEditable,
-                  onChanged: (v) => setState(() => isEditable = v),
+                  title: const Text("Jardin public"),
+                  value: isPublic,
+                  onChanged: (v) => setState(() => isPublic = v),
                 ),
 
-              const Spacer(),
+                if (isPublic)
+                  SwitchListTile(
+                    title: const Text("Modifiable par tous"),
+                    subtitle: const Text("Sinon lecture seule"),
+                    value: isEditable,
+                    onChanged: (v) => setState(() => isEditable = v),
+                  ),
 
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: loading ? null : _createGarden,
-                  child: loading
-                      ? const CircularProgressIndicator()
-                      : const Text("Créer le jardin"),
+                const SizedBox(height: 30),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: loading ? null : _createGarden,
+                    child: loading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text("Créer le jardin"),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

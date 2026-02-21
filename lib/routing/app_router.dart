@@ -6,9 +6,13 @@ import 'package:hortus_app/features/auth/views/forgot_password_page.dart';
 import 'package:hortus_app/features/auth/views/login_page.dart';
 import 'package:hortus_app/features/auth/views/register_page.dart';
 import 'package:hortus_app/features/gardens/views/add_garden_page.dart';
+import 'package:hortus_app/features/gardens/views/garden_chat_page.dart';
+import 'package:hortus_app/features/gardens/views/garden_details_page.dart';
+import 'package:hortus_app/features/gardens/views/garden_settings_page.dart';
 import 'package:hortus_app/features/map/views/garden_map_page.dart';
 import 'package:hortus_app/features/gardens/views/gardens_page.dart';
 import 'package:hortus_app/features/home/views/home_page.dart';
+import 'package:hortus_app/features/map/views/plant_details_sheet.dart';
 import 'package:hortus_app/routing/router_notifier.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -31,6 +35,23 @@ final routerProvider = Provider<GoRouter>((ref) {
           final id = state.pathParameters['id']!;
           return GardenMapPage(gardenId: id);
         },
+      ),
+      GoRoute(
+        path: '/garden-details/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return GardenDetailsPage(gardenId: id);
+        },
+      ),
+      GoRoute(
+        path: '/garden-chat/:id',
+        builder: (c, s) => GardenChatPage(gardenId: s.pathParameters['id']!),
+      ),
+
+      GoRoute(
+        path: '/garden-settings/:id',
+        builder: (c, s) =>
+            GardenSettingsPage(gardenId: s.pathParameters['id']!),
       ),
     ],
   );

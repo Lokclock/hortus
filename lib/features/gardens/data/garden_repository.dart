@@ -80,20 +80,21 @@ class GardenRepository {
   Future<void> createGarden({
     required String name,
     required double width,
-    required double height,
+    required double length,
     required bool isPublic,
     required bool isEditable,
+    required String ownerUsername, // <-- ajouté
   }) async {
-    final uid = _auth.currentUser!.uid;
-
-    await _gardens.add({
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    await _firestore.collection('gardens').add({
       'name': name,
       'width': width,
-      'height': height,
+      'length': length,
       'isPublic': isPublic,
-      'ownerId': uid,
-      'createdAt': FieldValue.serverTimestamp(),
       'isEditable': isEditable,
+      'ownerId': uid,
+      'ownerUsername': ownerUsername, // <-- ajouté
+      'createdAt': FieldValue.serverTimestamp(),
     });
   }
 

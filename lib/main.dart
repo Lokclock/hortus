@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hortus_app/core/theme/app_theme.dart';
 import 'package:hortus_app/routing/app_router.dart';
 import 'firebase_options.dart';
 
@@ -20,6 +21,7 @@ class MyApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
+      theme: appTheme,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
     );

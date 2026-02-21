@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hortus_app/features/map/views/add_plant_page.dart';
 import 'package:hortus_app/features/plants/models/plant_model.dart';
 import 'package:hortus_app/features/plants/providers/plant_providers.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PlantDetailsSheet extends ConsumerWidget {
   final String gardenId;

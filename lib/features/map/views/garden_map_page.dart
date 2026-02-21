@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hortus_app/features/gardens/providers/garden_providers.dart';
 import 'package:hortus_app/features/map/providers/add_plant_provider.dart';
 import 'package:hortus_app/features/map/providers/garden_permissions_provider.dart';
 import 'package:hortus_app/features/map/providers/map_mode_provider.dart';
 import 'package:hortus_app/features/map/views/add_plant_page.dart';
 import 'package:hortus_app/features/map/views/garden_canvas.dart';
 import 'package:hortus_app/features/map/views/positioning_overlay.dart';
+import 'package:hortus_app/features/map/views/show_plants_list.dart';
 import '../../plants/providers/plant_providers.dart';
 
 class GardenMapPage extends ConsumerWidget {
@@ -16,6 +18,7 @@ class GardenMapPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(mapModeProvider);
     final plantsAsync = ref.watch(plantsStreamProvider(gardenId));
     final canEdit = ref.watch(canEditGardenProvider(gardenId));
 
@@ -35,13 +38,17 @@ class GardenMapPage extends ConsumerWidget {
             },
           ),
 
-          /// 🔝 MINI TOP BAR
-          _TopMapBar(),
-
           /// 🔻 FLOATING BOTTOM BAR
-          _BottomMapBar(canEdit: canEdit, gardenId: gardenId),
+          mode != MapMode.addPlant
+              ? _BottomMapBar(canEdit: canEdit, gardenId: gardenId)
+              : const SizedBox(),
 
           PositioningOverlay(gardenId: gardenId),
+
+          /// 🔝 MINI TOP BAR
+          mode != MapMode.addPlant
+              ? _TopMapBar(gardenId: gardenId)
+              : const SizedBox(),
         ],
       ),
     );
@@ -49,10 +56,14 @@ class GardenMapPage extends ConsumerWidget {
 }
 
 class _TopMapBar extends ConsumerWidget {
+  final String gardenId;
+
+  const _TopMapBar({required this.gardenId});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mode = ref.watch(mapModeProvider);
-    if (mode == MapMode.addPlant) return const SizedBox();
+    final gardenAsync = ref.watch(gardenProvider(gardenId));
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 8),
@@ -66,20 +77,42 @@ class _TopMapBar extends ConsumerWidget {
             boxShadow: const [BoxShadow(blurRadius: 8, color: Colors.black12)],
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
                 icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  context.push('/home');
-                },
+                onPressed: () => context.push('/home'),
               ),
+
               const SizedBox(width: 8),
-              const Text(
-                "Nom du jardin",
-                style: TextStyle(fontWeight: FontWeight.bold),
+
+              /// 👇 NOM CLIQUABLE
+              Expanded(
+                child: gardenAsync.when(
+                  loading: () => const Text("..."),
+                  error: (_, __) => const Text("Erreur"),
+                  data: (garden) => InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      context.push('/garden-details/${garden.id}');
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        garden.name,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
+
               const SizedBox(width: 8),
+
               IconButton(
                 icon: const Icon(Icons.center_focus_strong),
                 onPressed: () {
@@ -102,8 +135,8 @@ class _BottomMapBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mode = ref.watch(mapModeProvider);
-    if (mode == MapMode.addPlant) return const SizedBox();
+    final theme = Theme.of(context);
+
     return Positioned(
       bottom: 20,
       left: 0,
@@ -120,34 +153,30 @@ class _BottomMapBar extends ConsumerWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              /// FILTERS
               IconButton(
-                icon: const Icon(Icons.filter_alt),
+                icon: Icon(
+                  Icons.filter_none_rounded,
+                  size: 28,
+                  color: theme.colorScheme.primary,
+                ),
                 onPressed: () {
-                  /// plus tard : ouvrir panel filtres
+                  // ouvrir profil bottom sheet
                 },
               ),
-
               const SizedBox(width: 24),
-
-              /// LIST PLANTS
-              IconButton(
-                icon: const Icon(Icons.list),
-                onPressed: () {
-                  /// plus tard : ouvrir drawer plantes
-                },
-              ),
-
-              const SizedBox(width: 24),
-
-              /// ADD PLANT
               if (canEdit)
                 IconButton(
-                  icon: const Icon(Icons.add_circle, size: 32),
+                  icon: Icon(
+                    Icons.add,
+                    size: 28,
+                    color: theme.colorScheme.primary,
+                  ),
                   onPressed: () {
                     showModalBottomSheet(
                       context: context,
                       isScrollControlled: true,
+                      backgroundColor: Colors
+                          .transparent, // permet de voir le handle proprement
                       builder: (_) => SafeArea(
                         child: SingleChildScrollView(
                           padding: EdgeInsets.only(
@@ -156,14 +185,42 @@ class _BottomMapBar extends ConsumerWidget {
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
                               maxHeight:
-                                  MediaQuery.of(context).size.height * 0.9,
+                                  MediaQuery.of(context).size.height * 0.8,
                             ),
-                            child: AddPlantPage(gardenId: gardenId),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(16),
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // 🔹 HANDLE DRAG
+                                  Container(
+                                    width: 40,
+                                    height: 4,
+                                    margin: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[400],
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+
+                                  // 🔹 CONTENU EXISTANT
+                                  Expanded(
+                                    child: AddPlantPage(gardenId: gardenId),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ).whenComplete(() {
-                      // Si le mode n'est pas addPlant, c'est que l'utilisateur a quitté avant de finir
                       final mode = ref.read(mapModeProvider);
                       if (mode != MapMode.addPlant) {
                         ref.read(addPlantProvider.notifier).state =
@@ -172,6 +229,17 @@ class _BottomMapBar extends ConsumerWidget {
                     });
                   },
                 ),
+              const SizedBox(width: 24),
+              IconButton(
+                icon: Icon(
+                  Icons.list,
+                  size: 28,
+                  color: theme.colorScheme.primary,
+                ),
+                onPressed: () {
+                  showPlantsList(context, ref, gardenId);
+                },
+              ),
             ],
           ),
         ),

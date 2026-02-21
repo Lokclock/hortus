@@ -4,21 +4,25 @@ class Garden {
   final String id;
   final String name;
   final double width;
-  final double height;
+  final double length;
   final bool isPublic;
   final String ownerId;
   final DateTime createdAt;
   final bool isEditable;
+  final List<String>? imageUrl;
+  final String? ownerUsername;
 
   Garden({
     required this.id,
     required this.name,
     required this.width,
-    required this.height,
+    required this.length,
     required this.isPublic,
     required this.ownerId,
     required this.createdAt,
     required this.isEditable,
+    this.ownerUsername,
+    this.imageUrl,
   });
 
   bool canEdit(String uid) {
@@ -32,11 +36,13 @@ class Garden {
       id: id,
       name: data['name'] ?? '',
       width: (data['width'] ?? 0).toDouble(),
-      height: (data['height'] ?? 0).toDouble(),
+      length: (data['length'] ?? 0).toDouble(),
       isPublic: data['isPublic'] ?? false,
       ownerId: data['ownerId'] ?? '',
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       isEditable: data['isEditable'] ?? false,
+      imageUrl: data['imageUrl'],
+      ownerUsername: data['ownerUsername'] ?? '',
     );
   }
 
@@ -44,11 +50,13 @@ class Garden {
     return {
       'name': name,
       'width': width,
-      'height': height,
+      'length': length,
       'isPublic': isPublic,
       'ownerId': ownerId,
       'createdAt': Timestamp.fromDate(createdAt),
       'isEditable': isEditable,
+      'imageUrl': imageUrl,
+      'ownerUsername': ownerUsername,
     };
   }
 }
