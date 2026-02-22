@@ -17,12 +17,12 @@ class GardenPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     // Fond bleu sur tout l'écran
-    final sizePlus = Size(size.width + 400, size.height + 400);
+    final sizePlus = Size(size.width + 800, size.height + 800);
     final rectBackgroundPaint = Paint()
       ..color = Colors.blue.shade300
       ..style = PaintingStyle.fill
       ..strokeWidth = 2;
-    canvas.drawRect(Offset(-200, -200) & sizePlus, rectBackgroundPaint);
+    canvas.drawRect(Offset(-400, -400) & sizePlus, rectBackgroundPaint);
 
     // Rectangle du jardin (jaune)
     final rectPaint = Paint()
@@ -48,10 +48,10 @@ class GardenPainter extends CustomPainter {
         final t = tiles[y][x];
         if (t != TileType.empty) {
           final color = t == TileType.soil
-              ? Colors.brown
+              ? const Color.fromARGB(255, 57, 142, 52)
               : t == TileType.hard
-              ? Colors.grey
-              : Colors.transparent;
+              ? Color.fromARGB(255, 4, 99, 143)
+              : const Color.fromARGB(0, 4, 99, 143);
           canvas.drawRect(
             Rect.fromLTWH(x * tileSize, y * tileSize, tileSize, tileSize),
             Paint()..color = color.withOpacity(0.7),
@@ -61,11 +61,17 @@ class GardenPainter extends CustomPainter {
     }
 
     if (selectionStart != null && selectionEnd != null) {
-      // Convertir les positions en indices de tiles
-      final startX = (selectionStart!.dx / tileSize).floor();
-      final startY = (selectionStart!.dy / tileSize).floor();
-      final endX = (selectionEnd!.dx / tileSize).floor();
-      final endY = (selectionEnd!.dy / tileSize).floor();
+      // Convertir en indices de tiles
+      int startX = (selectionStart!.dx / tileSize).floor();
+      int startY = (selectionStart!.dy / tileSize).floor();
+      int endX = (selectionEnd!.dx / tileSize).floor();
+      int endY = (selectionEnd!.dy / tileSize).floor();
+
+      // 🔹 Clipper aux limites du tableau
+      startX = startX.clamp(0, tiles[0].length - 1);
+      endX = endX.clamp(0, tiles[0].length - 1);
+      startY = startY.clamp(0, tiles.length - 1);
+      endY = endY.clamp(0, tiles.length - 1);
 
       final left = startX < endX ? startX : endX;
       final right = startX > endX ? startX : endX;
@@ -74,7 +80,7 @@ class GardenPainter extends CustomPainter {
 
       final paint = Paint()..color = Colors.blue.withOpacity(0.3);
 
-      // Boucler sur toutes les tiles couvertes et dessiner un overlay
+      // Boucler seulement sur les tiles valides
       for (int y = top; y <= bottom; y++) {
         for (int x = left; x <= right; x++) {
           canvas.drawRect(

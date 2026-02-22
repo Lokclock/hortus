@@ -87,21 +87,19 @@ class _TileEditorPageState extends ConsumerState<TileEditorPage> {
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
                       onTapDown: (details) {
-                        final x = (details.localPosition.dx / tileSizePx)
-                            .floor();
-                        final y = (details.localPosition.dy / tileSizePx)
-                            .floor();
-                        if (x >= 0 &&
-                            x < state.tiles[0].length &&
-                            y >= 0 &&
-                            y < state.tiles.length) {
-                          final newTiles = List<List<TileType>>.generate(
-                            state.tiles.length,
-                            (yi) => List.from(state.tiles[yi]),
-                          );
-                          newTiles[y][x] = state.currentBrush;
-                          notifier.updateTiles(newTiles);
-                        }
+                        int x = (details.localPosition.dx / tileSizePx).floor();
+                        int y = (details.localPosition.dy / tileSizePx).floor();
+
+                        // 🔹 Clipper aux limites
+                        x = x.clamp(0, state.tiles[0].length - 1);
+                        y = y.clamp(0, state.tiles.length - 1);
+
+                        final newTiles = List<List<TileType>>.generate(
+                          state.tiles.length,
+                          (yi) => List.from(state.tiles[yi]),
+                        );
+                        newTiles[y][x] = state.currentBrush;
+                        notifier.updateTiles(newTiles);
                       },
                       onDoubleTapDown: (details) {
                         isSelecting = true;
@@ -128,6 +126,12 @@ class _TileEditorPageState extends ConsumerState<TileEditorPage> {
                           int right = x1 > x2 ? x1 : x2;
                           int top = y1 < y2 ? y1 : y2;
                           int bottom = y1 > y2 ? y1 : y2;
+
+                          // 🔹 Clip aux limites de la grille
+                          left = left.clamp(0, state.tiles[0].length - 1);
+                          right = right.clamp(0, state.tiles[0].length - 1);
+                          top = top.clamp(0, state.tiles.length - 1);
+                          bottom = bottom.clamp(0, state.tiles.length - 1);
 
                           final newTiles = List<List<TileType>>.generate(
                             state.tiles.length,
