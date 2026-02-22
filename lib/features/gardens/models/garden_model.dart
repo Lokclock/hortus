@@ -11,6 +11,8 @@ class Garden {
   final bool isEditable;
   final List<String>? imageUrl;
   final String? ownerUsername;
+  final String? backgroundType;
+  final Map<String, dynamic>? tilemap;
 
   Garden({
     required this.id,
@@ -23,6 +25,8 @@ class Garden {
     required this.isEditable,
     this.ownerUsername,
     this.imageUrl,
+    this.backgroundType,
+    this.tilemap,
   });
 
   bool canEdit(String uid) {
@@ -43,6 +47,8 @@ class Garden {
       isEditable: data['isEditable'] ?? false,
       imageUrl: data['imageUrl'],
       ownerUsername: data['ownerUsername'] ?? '',
+      backgroundType: data['backgroundType'],
+      tilemap: data['tilemap'],
     );
   }
 
@@ -57,6 +63,8 @@ class Garden {
       'isEditable': isEditable,
       'imageUrl': imageUrl,
       'ownerUsername': ownerUsername,
+      'backgroundType': backgroundType,
+      'tilemap': tilemap,
     };
   }
 }

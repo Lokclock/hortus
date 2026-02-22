@@ -38,18 +38,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
-              "Connexion",
-              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+            Text(
+              "H o r t u s",
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: theme.primaryColor,
+              ),
             ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 50),
 
             AuthTextField(controller: usernameCtrl, label: "Username"),
 

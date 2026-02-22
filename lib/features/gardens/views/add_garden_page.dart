@@ -23,27 +23,24 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
   bool isEditable = false;
   bool loading = false;
 
-  Future<void> _createGarden() async {
+  Future<void> _createGarden({bool openEditor = false}) async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => loading = true);
 
     try {
-      // 🔹 Récupérer l'utilisateur courant
       final uid = ref.read(currentUserProvider);
       if (uid == null) throw Exception("Utilisateur non connecté");
 
-      // 🔹 Récupérer le username depuis Firestore
       final userDoc = await ref
           .read(firestoreProvider)
           .collection('users')
           .doc(uid)
           .get();
-
       final username = userDoc.data()?['username'] ?? 'inconnu';
 
-      // 🔹 Créer le garden avec ownerUsername
-      await ref
+      // 🔹 Crée le jardin dans Firestore
+      final docRef = await ref
           .read(gardenRepoProvider)
           .createGarden(
             name: nameCtrl.text.trim(),
@@ -54,7 +51,16 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
             ownerUsername: username,
           );
 
-      if (mounted) context.push('/home');
+      final gardenId = docRef.id;
+
+      if (openEditor) {
+        if (mounted) {
+          Navigator.pop(context);
+          context.push('/tile_editor/$gardenId');
+        }
+      } else {
+        if (mounted) context.push('/home');
+      }
     } catch (e) {
       setState(() => loading = false);
       ScaffoldMessenger.of(
@@ -127,6 +133,42 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
                     value: isEditable,
                     onChanged: (v) => setState(() => isEditable = v),
                   ),
+
+                const SizedBox(height: 30),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: loading
+                        ? null
+                        : () => _createGarden(openEditor: false),
+                    child: loading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text("Créer et importer une image"),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: loading
+                        ? null
+                        : () => _createGarden(openEditor: true),
+                    child: loading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text("Créer et ouvrir l’éditeur"),
+                  ),
+                ),
 
                 const SizedBox(height: 30),
 

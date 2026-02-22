@@ -77,29 +77,54 @@ class GardenRepository {
   }
 
   /// 🌿 Ajouter un jardin
-  Future<void> createGarden({
+  Future<DocumentReference> createGarden({
     required String name,
     required double width,
     required double length,
     required bool isPublic,
     required bool isEditable,
-    required String ownerUsername, // <-- ajouté
+    required String ownerUsername,
   }) async {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    await _firestore.collection('gardens').add({
+    final uid = _auth.currentUser!.uid;
+
+    final docRef = await _gardens.add({
       'name': name,
       'width': width,
       'length': length,
       'isPublic': isPublic,
       'isEditable': isEditable,
       'ownerId': uid,
-      'ownerUsername': ownerUsername, // <-- ajouté
+      'ownerUsername': ownerUsername,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    return docRef; // <-- retourne le DocumentReference
   }
 
   /// 🪓 Supprimer un jardin
   Future<void> deleteGarden(String id) async {
     await _gardens.doc(id).delete();
+  }
+
+  /// 🔹 Update tilemap of a garden
+  Future<void> updateGardenTilemap(
+    String gardenId,
+    Map<String, dynamic> tilemap,
+  ) async {
+    await _gardens.doc(gardenId).set({
+      'backgroundType': 'tilemap',
+      'tilemap': tilemap,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  /// 🔹 Récupère un jardin une seule fois
+  Future<Garden> getGardenOnce(String gardenId) async {
+    final doc = await _gardens.doc(gardenId).get();
+    final data = doc.data();
+    if (data == null) {
+      throw Exception("Garden not found");
+    }
+    return Garden.fromMap(data as Map<String, dynamic>, doc.id);
   }
 }
