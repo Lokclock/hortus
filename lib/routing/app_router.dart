@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import 'package:hortus_app/features/auth/views/auth_gate.dart';
 import 'package:hortus_app/features/auth/views/forgot_password_page.dart';
 import 'package:hortus_app/features/auth/views/login_page.dart';
@@ -12,7 +11,6 @@ import 'package:hortus_app/features/gardens/views/garden_settings_page.dart';
 import 'package:hortus_app/features/map/views/garden_map_page.dart';
 import 'package:hortus_app/features/gardens/views/gardens_page.dart';
 import 'package:hortus_app/features/home/views/home_page.dart';
-import 'package:hortus_app/features/map/views/plant_details_sheet.dart';
 import 'package:hortus_app/features/map_editor/views/tile_editor_page.dart';
 import 'package:hortus_app/routing/router_notifier.dart';
 

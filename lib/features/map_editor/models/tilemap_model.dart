@@ -1,64 +1,43 @@
-enum TileType { empty, soil, path, grass, water, forbidden }
+class TileMap {
+  final int width;
+  final int height;
+  final List<int> tiles;
 
-class TileMapData {
-  final int rows;
-  final int cols;
-  final double tileSize;
-  final List<int> sprites;
-  final List<int> types;
+  TileMap({required this.width, required this.height, required this.tiles});
 
-  TileMapData({
-    required this.rows,
-    required this.cols,
-    required this.tileSize,
-    required this.sprites,
-    required this.types,
-  });
+  int getTile(int x, int y) => tiles[y * width + x];
 
-  int index(int row, int col) => row * cols + col;
+  TileMap copyWithTile(int x, int y, int value) {
+    final newTiles = List<int>.from(tiles);
+    newTiles[y * width + x] = value;
 
-  void setTile(int row, int col, int spriteIndex, TileType type) {
-    final i = index(row, col);
-    sprites[i] = spriteIndex;
-    types[i] = type.index;
+    return TileMap(width: width, height: height, tiles: newTiles);
   }
 
-  TileType getType(int row, int col) {
-    return TileType.values[types[index(row, col)]];
+  TileMap paintRect(int x1, int y1, int x2, int y2, int value) {
+    final newTiles = List<int>.from(tiles);
+
+    final minX = x1 < x2 ? x1 : x2;
+    final maxX = x1 > x2 ? x1 : x2;
+    final minY = y1 < y2 ? y1 : y2;
+    final maxY = y1 > y2 ? y1 : y2;
+
+    for (int y = minY; y <= maxY; y++) {
+      for (int x = minX; x <= maxX; x++) {
+        newTiles[y * width + x] = value;
+      }
+    }
+
+    return TileMap(width: width, height: height, tiles: newTiles);
   }
 
-  int getSprite(int row, int col) {
-    return sprites[index(row, col)];
-  }
+  Map<String, dynamic> toMap() => {'w': width, 'h': height, 'tiles': tiles};
 
-  Map<String, dynamic> toMap() {
-    return {
-      'rows': rows,
-      'cols': cols,
-      'tileSize': tileSize,
-      'sprites': sprites,
-      'types': types,
-    };
-  }
-
-  factory TileMapData.fromMap(Map<String, dynamic> map) {
-    return TileMapData(
-      rows: map['rows'],
-      cols: map['cols'],
-      tileSize: (map['tileSize'] as num).toDouble(),
-      sprites: List<int>.from(map['sprites']),
-      types: List<int>.from(map['types']),
-    );
-  }
-
-  factory TileMapData.empty(int rows, int cols, double tileSize) {
-    final count = rows * cols;
-    return TileMapData(
-      rows: rows,
-      cols: cols,
-      tileSize: tileSize,
-      sprites: List.filled(count, 0),
-      types: List.filled(count, TileType.empty.index),
+  factory TileMap.fromMap(Map<String, dynamic> map) {
+    return TileMap(
+      width: map['w'],
+      height: map['h'],
+      tiles: List<int>.from(map['tiles']),
     );
   }
 }

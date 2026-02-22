@@ -1,11 +1,7 @@
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hortus_app/features/gardens/models/garden_model.dart';
-import 'package:hortus_app/features/gardens/providers/garden_providers.dart';
-import '../models/tilemap_model.dart';
-import '../models/zone_model.dart';
+import '../../gardens/providers/garden_providers.dart';
+import '../providers/tile_editor_notifier.dart';
 import '../widgets/tilemap_painter.dart';
 
 class TileEditorPage extends ConsumerStatefulWidget {
@@ -18,227 +14,147 @@ class TileEditorPage extends ConsumerStatefulWidget {
 }
 
 class _TileEditorPageState extends ConsumerState<TileEditorPage> {
-  late TileMapData map;
+  bool paintMode = false;
+  Offset? selectionStart;
+  Offset? selectionEnd;
+  bool isSelecting = false;
 
-  TileType selectedType = TileType.soil;
-  ZoneType selectedZoneType = ZoneType.soil;
-
-  bool isPainting = false;
-  int? lastPaintedIndex;
-  bool initialized = false;
-  List<ui.Image> tileset = [];
-  bool loading = true;
-
-  List<Zone> zones = [];
-
-  // Transformation pour zoom/drag
-  double scale = 1.0;
-  Offset offset = Offset.zero;
-  Offset lastFocalPoint = Offset.zero;
-
-  @override
-  void initState() {
-    super.initState();
-    map = TileMapData.empty(20, 20, 32);
-    _initMapAndTileset();
-  }
-
-  Future<void> _initMapAndTileset() async {
-    // TileMap vide par défaut ou Firestore plus tard
-    map = TileMapData.empty(20, 20, 32);
-
-    // Charge l'image complète du tileset
-    final tilemapImage = await loadTilemapImage('assets/tiles/tilemap.png');
-
-    // Exemple : 12 lignes x 24 colonnes dans l'image
-    const int tilesetRows = 12;
-    const int tilesetCols = 24;
-
-    final tileWidth = tilemapImage.width ~/ tilesetCols;
-    final tileHeight = tilemapImage.height ~/ tilesetRows;
-
-    List<ui.Image> loadedTileset = [];
-
-    for (int y = 0; y < tilesetRows; y++) {
-      for (int x = 0; x < tilesetCols; x++) {
-        final recorder = ui.PictureRecorder();
-        final canvas = Canvas(recorder);
-
-        final srcRect = Rect.fromLTWH(
-          x * tileWidth.toDouble(),
-          y * tileHeight.toDouble(),
-          tileWidth.toDouble(),
-          tileHeight.toDouble(),
-        );
-
-        final dstRect = Rect.fromLTWH(
-          0,
-          0,
-          tileWidth.toDouble(),
-          tileHeight.toDouble(),
-        );
-        canvas.drawImageRect(tilemapImage, srcRect, dstRect, Paint());
-
-        final tileImage = await recorder.endRecording().toImage(
-          tileWidth,
-          tileHeight,
-        );
-        loadedTileset.add(tileImage);
-      }
-    }
-
-    setState(() {
-      tileset = loadedTileset;
-      loading = false;
-    });
-  }
-
-  Future<ui.Image> loadTilemapImage(String assetPath) async {
-    final data = await rootBundle.load(assetPath);
-    final bytes = data.buffer.asUint8List();
-    final codec = await ui.instantiateImageCodec(bytes);
-    final frame = await codec.getNextFrame();
-    return frame.image;
-  }
-
-  void _initMapIfNeeded(Garden garden) {
-    if (initialized) return;
-    if (garden.tilemap != null) {
-      map = TileMapData.fromMap(garden.tilemap!);
-    } else {
-      map = TileMapData.empty(20, 20, 32);
-    }
-    initialized = true;
-  }
-
-  void _handleTouch(Offset localPos) {
-    // Transforme la position selon le zoom/offset
-    final local = (localPos - offset) / scale;
-
-    // Définir la zone en carré fixe (ex : 1 tile)
-    const tileSize = 32.0;
-    final rect = Rect.fromLTWH(
-      (local.dx ~/ tileSize) * tileSize,
-      (local.dy ~/ tileSize) * tileSize,
-      tileSize,
-      tileSize,
-    );
-
-    setState(() {
-      zones.add(Zone(rect: rect, type: selectedZoneType));
-    });
-  }
-
-  Future<void> _renderTiles() async {
-    // Exemple simple : remplit les zones soil avec sprite 1 et hard avec sprite 2
-    for (var zone in zones) {
-      final startRow = (zone.rect.top ~/ map.tileSize).toInt();
-      final endRow = (zone.rect.bottom ~/ map.tileSize).toInt();
-      final startCol = (zone.rect.left ~/ map.tileSize).toInt();
-      final endCol = (zone.rect.right ~/ map.tileSize).toInt();
-
-      for (int r = startRow; r < endRow; r++) {
-        for (int c = startCol; c < endCol; c++) {
-          map.setTile(
-            r,
-            c,
-            zone.type == ZoneType.soil ? 1 : 2,
-            zone.type == ZoneType.soil ? TileType.soil : TileType.forbidden,
-          );
-        }
-      }
-    }
-
-    setState(() {
-      zones.clear(); // on efface les zones après rendu
-    });
-  }
-
-  Future<void> _saveMap() async {
-    final repo = ref.read(gardenRepoProvider);
-    await repo.updateGardenTilemap(widget.gardenId, map.toMap());
-    if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Map sauvegardée")));
-    }
-  }
+  static const double tileSizeMeters = 0.2;
+  static const double pixelsPerMeter = 100;
 
   @override
   Widget build(BuildContext context) {
     final gardenAsync = ref.watch(gardenProvider(widget.gardenId));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Tile Editor"),
-        actions: [
-          IconButton(icon: const Icon(Icons.save), onPressed: _saveMap),
-          IconButton(icon: const Icon(Icons.brush), onPressed: _renderTiles),
-        ],
-      ),
-      body: gardenAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text("Erreur: $e")),
-        data: (garden) {
-          _initMapIfNeeded(garden);
+    return gardenAsync.when(
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, _) => Scaffold(body: Center(child: Text(e.toString()))),
+      data: (garden) {
+        final tilesX = (garden.width / tileSizeMeters).ceil();
+        final tilesY = (garden.length / tileSizeMeters).ceil();
+        final tileSizePx = tileSizeMeters * pixelsPerMeter;
 
-          if (loading) return const Center(child: CircularProgressIndicator());
+        final notifier = ref.read(
+          tileEditorProvider(
+            Size(tilesX.toDouble(), tilesY.toDouble()),
+          ).notifier,
+        );
+        final state = ref.watch(
+          tileEditorProvider(Size(tilesX.toDouble(), tilesY.toDouble())),
+        );
 
-          return Column(
-            children: [
-              _buildZoneTypePalette(),
-              Expanded(
-                child: InteractiveViewer(
-                  scaleEnabled: true,
-                  panEnabled: true,
-                  minScale: 0.5,
-                  maxScale: 3.0,
-                  child: GestureDetector(
-                    onPanStart: (d) => _handleTouch(d.localPosition),
-                    onPanUpdate: (d) => _handleTouch(d.localPosition),
-                    onTapDown: (d) => _handleTouch(d.localPosition),
-                    child: CustomPaint(
-                      painter: TileMapPainter(map, tileset, zones: zones),
-                      size: Size(
-                        map.cols * map.tileSize,
-                        map.rows * map.tileSize,
-                      ),
-                    ),
-                  ),
-                ),
+        return Scaffold(
+          appBar: AppBar(
+            title: Text("Tile Editor: ${garden.name}"),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.park),
+                onPressed: () => notifier.setBrush(TileType.soil),
+              ),
+              IconButton(
+                icon: const Icon(Icons.grid_on),
+                onPressed: () => notifier.setBrush(TileType.hard),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete),
+                onPressed: () => notifier.setBrush(TileType.empty),
+              ),
+              IconButton(
+                icon: Icon(paintMode ? Icons.edit : Icons.open_with),
+                onPressed: () => setState(() => paintMode = !paintMode),
               ),
             ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildZoneTypePalette() {
-    return SizedBox(
-      height: 70,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: ZoneType.values.map((type) {
-          return GestureDetector(
-            onTap: () => setState(() => selectedZoneType = type),
-            child: Container(
-              margin: const EdgeInsets.all(8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: selectedZoneType == type
-                      ? Colors.black
-                      : Colors.transparent,
-                  width: 3,
+          ),
+          body: InteractiveViewer(
+            minScale: 0.2,
+            maxScale: 8,
+            boundaryMargin: const EdgeInsets.all(double.infinity),
+            constrained: false,
+            child: Stack(
+              children: [
+                CustomPaint(
+                  size: Size(tilesX * tileSizePx, tilesY * tileSizePx),
+                  painter: GardenPainter(
+                    tiles: state.tiles,
+                    tileSize: tileSizePx,
+                    selectionStart: selectionStart,
+                    selectionEnd: selectionEnd,
+                  ),
                 ),
-                color: type == ZoneType.soil ? Colors.brown : Colors.grey,
-              ),
-              child: Text(type.name),
+                if (paintMode)
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTapDown: (details) {
+                        final x = (details.localPosition.dx / tileSizePx)
+                            .floor();
+                        final y = (details.localPosition.dy / tileSizePx)
+                            .floor();
+                        if (x >= 0 &&
+                            x < state.tiles[0].length &&
+                            y >= 0 &&
+                            y < state.tiles.length) {
+                          final newTiles = List<List<TileType>>.generate(
+                            state.tiles.length,
+                            (yi) => List.from(state.tiles[yi]),
+                          );
+                          newTiles[y][x] = state.currentBrush;
+                          notifier.updateTiles(newTiles);
+                        }
+                      },
+                      onDoubleTapDown: (details) {
+                        isSelecting = true;
+                        selectionStart = details.localPosition;
+                        selectionEnd = details.localPosition;
+                        setState(() {});
+                      },
+                      onPanUpdate: (details) {
+                        if (isSelecting) {
+                          selectionEnd = details.localPosition;
+                          setState(() {});
+                        }
+                      },
+                      onPanEnd: (details) {
+                        if (isSelecting &&
+                            selectionStart != null &&
+                            selectionEnd != null) {
+                          int x1 = (selectionStart!.dx / tileSizePx).floor();
+                          int y1 = (selectionStart!.dy / tileSizePx).floor();
+                          int x2 = (selectionEnd!.dx / tileSizePx).floor();
+                          int y2 = (selectionEnd!.dy / tileSizePx).floor();
+
+                          int left = x1 < x2 ? x1 : x2;
+                          int right = x1 > x2 ? x1 : x2;
+                          int top = y1 < y2 ? y1 : y2;
+                          int bottom = y1 > y2 ? y1 : y2;
+
+                          final newTiles = List<List<TileType>>.generate(
+                            state.tiles.length,
+                            (y) => List.from(state.tiles[y]),
+                          );
+
+                          for (int y = top; y <= bottom; y++) {
+                            for (int x = left; x <= right; x++) {
+                              newTiles[y][x] = state.currentBrush;
+                            }
+                          }
+
+                          notifier.updateTiles(newTiles);
+
+                          selectionStart = null;
+                          selectionEnd = null;
+                          isSelecting = false;
+                          setState(() {});
+                        }
+                      },
+                    ),
+                  ),
+              ],
             ),
-          );
-        }).toList(),
-      ),
+          ),
+        );
+      },
     );
   }
 }
