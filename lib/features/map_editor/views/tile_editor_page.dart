@@ -22,6 +22,57 @@ class _TileEditorPageState extends ConsumerState<TileEditorPage> {
   static const double tileSizeMeters = 0.2;
   static const double pixelsPerMeter = 100;
 
+  Widget _buildBottomBar(TileEditorNotifier notifier) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.85),
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _toolButton(Icons.park, Colors.brown, () {
+            notifier.setBrush(TileType.soil);
+            setState(() => paintMode = true);
+          }),
+
+          _toolButton(Icons.grid_on, Colors.grey, () {
+            notifier.setBrush(TileType.hard);
+            setState(() => paintMode = true);
+          }),
+
+          _toolButton(Icons.delete, Colors.red, () {
+            notifier.setBrush(TileType.empty);
+            setState(() => paintMode = true);
+          }),
+
+          _toolButton(Icons.open_with, Colors.blue, () {
+            setState(() => paintMode = false);
+          }),
+
+          _toolButton(Icons.undo, Colors.white, notifier.undo),
+          _toolButton(Icons.redo, Colors.white, notifier.redo),
+        ],
+      ),
+    );
+  }
+
+  Widget _toolButton(IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.black,
+          shape: BoxShape.circle,
+          border: Border.all(color: color, width: 2),
+        ),
+        child: Icon(icon, color: color),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final gardenAsync = ref.watch(gardenProvider(widget.gardenId));
@@ -45,117 +96,144 @@ class _TileEditorPageState extends ConsumerState<TileEditorPage> {
         );
 
         return Scaffold(
-          appBar: AppBar(
-            title: Text("Tile Editor: ${garden.name}"),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.park),
-                onPressed: () => notifier.setBrush(TileType.soil),
+          appBar: AppBar(title: Text("Tile Editor: ${garden.name}")),
+          body: Stack(
+            children: [
+              InteractiveViewer(
+                minScale: 0.2,
+                maxScale: 8,
+                boundaryMargin: const EdgeInsets.all(double.infinity),
+                constrained: false,
+                child: Stack(
+                  children: [
+                    CustomPaint(
+                      size: Size(tilesX * tileSizePx, tilesY * tileSizePx),
+                      painter: GardenPainter(
+                        tiles: state.tiles,
+                        tileSize: tileSizePx,
+                        selectionStart: selectionStart,
+                        selectionEnd: selectionEnd,
+                      ),
+                    ),
+                    if (paintMode)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.translucent,
+
+                          /// TAP = peindre une seule case
+                          onTapDown: (details) {
+                            if (!paintMode) return;
+
+                            final x = (details.localPosition.dx / tileSizePx)
+                                .floor();
+                            final y = (details.localPosition.dy / tileSizePx)
+                                .floor();
+
+                            final width = state.tiles[0].length;
+                            final height = state.tiles.length;
+
+                            if (x >= 0 && x < width && y >= 0 && y < height) {
+                              notifier.paintTile(x, y);
+                            }
+                          },
+
+                          /// DOUBLE TAP = début sélection rectangle
+                          onDoubleTapDown: (details) {
+                            if (!paintMode) return;
+
+                            isSelecting = true;
+                            selectionStart = details.localPosition;
+                            selectionEnd = details.localPosition;
+                            setState(() {});
+                          },
+
+                          /// DRAG = soit pinceau soit sélection
+                          onPanUpdate: (details) {
+                            if (!paintMode) return;
+
+                            /// --- MODE RECTANGLE ---
+                            if (isSelecting) {
+                              selectionEnd = details.localPosition;
+                              setState(() {});
+                              return;
+                            }
+
+                            /// --- MODE PINCEAU CONTINU ---
+                            final x = (details.localPosition.dx / tileSizePx)
+                                .floor();
+                            final y = (details.localPosition.dy / tileSizePx)
+                                .floor();
+
+                            final width = state.tiles[0].length;
+                            final height = state.tiles.length;
+
+                            if (x >= 0 && x < width && y >= 0 && y < height) {
+                              notifier.paintInterpolated(x, y);
+                            }
+                          },
+
+                          /// FIN DU DRAG
+                          onPanEnd: (details) {
+                            if (!paintMode) return;
+
+                            notifier.endPaint();
+
+                            /// --- FIN SELECTION RECTANGLE ---
+                            if (isSelecting &&
+                                selectionStart != null &&
+                                selectionEnd != null) {
+                              int x1 = (selectionStart!.dx / tileSizePx)
+                                  .floor();
+                              int y1 = (selectionStart!.dy / tileSizePx)
+                                  .floor();
+                              int x2 = (selectionEnd!.dx / tileSizePx).floor();
+                              int y2 = (selectionEnd!.dy / tileSizePx).floor();
+
+                              final width = state.tiles[0].length;
+                              final height = state.tiles.length;
+
+                              /// clamp dans les limites du jardin
+                              x1 = x1.clamp(0, width - 1);
+                              x2 = x2.clamp(0, width - 1);
+                              y1 = y1.clamp(0, height - 1);
+                              y2 = y2.clamp(0, height - 1);
+
+                              int left = x1 < x2 ? x1 : x2;
+                              int right = x1 > x2 ? x1 : x2;
+                              int top = y1 < y2 ? y1 : y2;
+                              int bottom = y1 > y2 ? y1 : y2;
+
+                              final newTiles = List<List<TileType>>.generate(
+                                state.tiles.length,
+                                (y) => List.from(state.tiles[y]),
+                              );
+
+                              for (int y = top; y <= bottom; y++) {
+                                for (int x = left; x <= right; x++) {
+                                  newTiles[y][x] = state.currentBrush;
+                                }
+                              }
+
+                              notifier.updateTiles(newTiles);
+
+                              selectionStart = null;
+                              selectionEnd = null;
+                              isSelecting = false;
+                              setState(() {});
+                            }
+                          },
+                        ),
+                      ),
+                  ],
+                ),
               ),
-              IconButton(
-                icon: const Icon(Icons.grid_on),
-                onPressed: () => notifier.setBrush(TileType.hard),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete),
-                onPressed: () => notifier.setBrush(TileType.empty),
-              ),
-              IconButton(
-                icon: Icon(paintMode ? Icons.edit : Icons.open_with),
-                onPressed: () => setState(() => paintMode = !paintMode),
+              Positioned(
+                left: 20,
+                right: 20,
+                bottom: 20,
+                child: _buildBottomBar(notifier),
               ),
             ],
-          ),
-          body: InteractiveViewer(
-            minScale: 0.2,
-            maxScale: 8,
-            boundaryMargin: const EdgeInsets.all(double.infinity),
-            constrained: false,
-            child: Stack(
-              children: [
-                CustomPaint(
-                  size: Size(tilesX * tileSizePx, tilesY * tileSizePx),
-                  painter: GardenPainter(
-                    tiles: state.tiles,
-                    tileSize: tileSizePx,
-                    selectionStart: selectionStart,
-                    selectionEnd: selectionEnd,
-                  ),
-                ),
-                if (paintMode)
-                  Positioned.fill(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onTapDown: (details) {
-                        int x = (details.localPosition.dx / tileSizePx).floor();
-                        int y = (details.localPosition.dy / tileSizePx).floor();
-
-                        // 🔹 Clipper aux limites
-                        x = x.clamp(0, state.tiles[0].length - 1);
-                        y = y.clamp(0, state.tiles.length - 1);
-
-                        final newTiles = List<List<TileType>>.generate(
-                          state.tiles.length,
-                          (yi) => List.from(state.tiles[yi]),
-                        );
-                        newTiles[y][x] = state.currentBrush;
-                        notifier.updateTiles(newTiles);
-                      },
-                      onDoubleTapDown: (details) {
-                        isSelecting = true;
-                        selectionStart = details.localPosition;
-                        selectionEnd = details.localPosition;
-                        setState(() {});
-                      },
-                      onPanUpdate: (details) {
-                        if (isSelecting) {
-                          selectionEnd = details.localPosition;
-                          setState(() {});
-                        }
-                      },
-                      onPanEnd: (details) {
-                        if (isSelecting &&
-                            selectionStart != null &&
-                            selectionEnd != null) {
-                          int x1 = (selectionStart!.dx / tileSizePx).floor();
-                          int y1 = (selectionStart!.dy / tileSizePx).floor();
-                          int x2 = (selectionEnd!.dx / tileSizePx).floor();
-                          int y2 = (selectionEnd!.dy / tileSizePx).floor();
-
-                          int left = x1 < x2 ? x1 : x2;
-                          int right = x1 > x2 ? x1 : x2;
-                          int top = y1 < y2 ? y1 : y2;
-                          int bottom = y1 > y2 ? y1 : y2;
-
-                          // 🔹 Clip aux limites de la grille
-                          left = left.clamp(0, state.tiles[0].length - 1);
-                          right = right.clamp(0, state.tiles[0].length - 1);
-                          top = top.clamp(0, state.tiles.length - 1);
-                          bottom = bottom.clamp(0, state.tiles.length - 1);
-
-                          final newTiles = List<List<TileType>>.generate(
-                            state.tiles.length,
-                            (y) => List.from(state.tiles[y]),
-                          );
-
-                          for (int y = top; y <= bottom; y++) {
-                            for (int x = left; x <= right; x++) {
-                              newTiles[y][x] = state.currentBrush;
-                            }
-                          }
-
-                          notifier.updateTiles(newTiles);
-
-                          selectionStart = null;
-                          selectionEnd = null;
-                          isSelecting = false;
-                          setState(() {});
-                        }
-                      },
-                    ),
-                  ),
-              ],
-            ),
           ),
         );
       },

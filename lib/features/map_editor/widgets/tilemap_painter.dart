@@ -17,12 +17,12 @@ class GardenPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     // Fond bleu sur tout l'écran
-    final sizePlus = Size(size.width + 800, size.height + 800);
+    final sizePlus = Size(size.width + 10000, size.height + 10000);
     final rectBackgroundPaint = Paint()
       ..color = Colors.blue.shade300
       ..style = PaintingStyle.fill
       ..strokeWidth = 2;
-    canvas.drawRect(Offset(-400, -400) & sizePlus, rectBackgroundPaint);
+    canvas.drawRect(Offset(-5000, -5000) & sizePlus, rectBackgroundPaint);
 
     // Rectangle du jardin (jaune)
     final rectPaint = Paint()
