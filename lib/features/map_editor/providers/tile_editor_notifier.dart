@@ -143,6 +143,39 @@ class TileEditorNotifier extends StateNotifier<TileEditorState> {
     _undoStack.add(TileHistory(_clone(state.tiles)));
     state = state.copyWith(tiles: _redoStack.removeLast().tiles);
   }
+
+  void paintRectangle(Offset start, Offset end, double tileSizePx) {
+    final width = state.tiles[0].length;
+    final height = state.tiles.length;
+
+    int x1 = (start.dx / tileSizePx).floor();
+    int y1 = (start.dy / tileSizePx).floor();
+    int x2 = (end.dx / tileSizePx).floor();
+    int y2 = (end.dy / tileSizePx).floor();
+
+    // 🔹 Clamp pour éviter crash hors grille
+    x1 = x1.clamp(0, width - 1);
+    x2 = x2.clamp(0, width - 1);
+    y1 = y1.clamp(0, height - 1);
+    y2 = y2.clamp(0, height - 1);
+
+    final left = x1 < x2 ? x1 : x2;
+    final right = x1 > x2 ? x1 : x2;
+    final top = y1 < y2 ? y1 : y2;
+    final bottom = y1 > y2 ? y1 : y2;
+
+    _pushUndo(); // ⭐ important pour undo
+
+    final newTiles = _clone(state.tiles);
+
+    for (int y = top; y <= bottom; y++) {
+      for (int x = left; x <= right; x++) {
+        newTiles[y][x] = state.currentBrush;
+      }
+    }
+
+    state = state.copyWith(tiles: newTiles);
+  }
 }
 
 final tileEditorProvider =

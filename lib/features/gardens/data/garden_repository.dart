@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hortus_app/features/gardens/models/garden_model.dart';
+import 'package:hortus_app/features/map_editor/providers/tile_editor_notifier.dart';
 import 'package:rxdart/rxdart.dart';
 
 class GardenRepository {
@@ -84,6 +85,7 @@ class GardenRepository {
     required bool isPublic,
     required bool isEditable,
     required String ownerUsername,
+    required List<List<TileType>> tiles,
   }) async {
     final uid = _auth.currentUser!.uid;
 

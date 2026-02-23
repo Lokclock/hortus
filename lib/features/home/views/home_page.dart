@@ -59,7 +59,10 @@ class HomePage extends StatelessWidget {
 
             /// ADD GARDEN (bouton central)
             IconButton(
-              onPressed: () => _openSheet(context, const AddGardenPage()),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AddGardenPage()),
+              ),
               icon: Icon(Icons.add, color: theme.colorScheme.primary),
             ),
 

@@ -11,7 +11,6 @@ import 'package:hortus_app/features/gardens/views/garden_settings_page.dart';
 import 'package:hortus_app/features/map/views/garden_map_page.dart';
 import 'package:hortus_app/features/gardens/views/gardens_page.dart';
 import 'package:hortus_app/features/home/views/home_page.dart';
-import 'package:hortus_app/features/map_editor/views/tile_editor_page.dart';
 import 'package:hortus_app/routing/router_notifier.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -27,7 +26,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/forgot', builder: (_, __) => ForgotPasswordPage()),
       GoRoute(path: '/home', builder: (_, __) => const HomePage()),
       GoRoute(path: '/gardens', builder: (_, __) => const GardensPage()),
-      GoRoute(path: '/add-garden', builder: (_, __) => const AddGardenPage()),
+      GoRoute(path: '/add-garden', builder: (_, __) => AddGardenPage()),
       GoRoute(
         path: '/garden/:id',
         builder: (context, state) {
@@ -51,12 +50,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/garden-settings/:id',
         builder: (c, s) =>
             GardenSettingsPage(gardenId: s.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: '/tile_editor/:id',
-        builder: (c, s) {
-          return TileEditorPage(gardenId: s.pathParameters['id']!);
-        },
       ),
     ],
   );
