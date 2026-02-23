@@ -176,6 +176,15 @@ class TileEditorNotifier extends StateNotifier<TileEditorState> {
 
     state = state.copyWith(tiles: newTiles);
   }
+
+  void reset(int width, int height) {
+    state = TileEditorState(
+      tiles: List.generate(
+        height,
+        (_) => List.generate(width, (_) => TileType.empty),
+      ),
+    );
+  }
 }
 
 final tileEditorProvider =

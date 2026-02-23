@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:hortus_app/features/map_editor/providers/tile_editor_notifier.dart';
 
@@ -6,12 +8,18 @@ class GardenPainter extends CustomPainter {
   final double tileSize;
   final Offset? selectionStart;
   final Offset? selectionEnd;
+  final ui.Image tileImage;
+  final Map<int, Rect> soilRects;
+  final Map<int, Rect> hardRects;
 
   GardenPainter({
     required this.tiles,
     required this.tileSize,
     this.selectionStart,
     this.selectionEnd,
+    required this.tileImage,
+    required this.soilRects,
+    required this.hardRects,
   });
 
   @override
@@ -94,4 +102,34 @@ class GardenPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+int computeMask(List<List<TileType>> tiles, int x, int y) {
+  final width = tiles[0].length;
+  final height = tiles.length;
+  final type = tiles[y][x];
+
+  int mask = 0;
+
+  // Nord
+  if (y > 0 && tiles[y - 1][x] == type) {
+    mask |= 1;
+  }
+
+  // Est
+  if (x < width - 1 && tiles[y][x + 1] == type) {
+    mask |= 2;
+  }
+
+  // Sud
+  if (y < height - 1 && tiles[y + 1][x] == type) {
+    mask |= 4;
+  }
+
+  // Ouest
+  if (x > 0 && tiles[y][x - 1] == type) {
+    mask |= 8;
+  }
+
+  return mask;
 }
