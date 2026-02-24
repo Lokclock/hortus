@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../gardens/views/gardens_page.dart';
-import '../../gardens/views/add_garden_page.dart';
+import '../../map_editor/views/add_garden_page.dart';
 import 'profile_page.dart';
 
 class HomePage extends StatelessWidget {
