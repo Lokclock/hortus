@@ -1,4 +1,6 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hortus_app/features/map_editor/providers/tile_editor_notifier.dart';
 import 'package:hortus_app/features/map_editor/widgets/tilemap_painter.dart';
@@ -37,7 +39,50 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
 
   static const double tileSizeMeters = 0.2;
   static const double pixelsPerMeter = 100;
+  ui.Image? soilImage;
+  ui.Image? hardImage;
+  Map<int, Rect>? soilRects;
+  Map<int, Rect>? hardRects;
 
+  @override
+  void initState() {
+    super.initState();
+    _tilesetFuture = loadTileset();
+  }
+
+  Future<void>? _tilesetFuture;
+
+  Future<void> loadTileset() async {
+    // Soil
+    final soilData = await rootBundle.load('assets/tiles/tilemap_soil.png');
+    final soilCodec = await ui.instantiateImageCodec(
+      soilData.buffer.asUint8List(),
+    );
+    final soilFrame = await soilCodec.getNextFrame();
+    soilImage = soilFrame.image;
+
+    soilRects = generateAutoTileRects(
+      tilePixelSize: 64,
+      columns: 10,
+      startIndex: 0,
+      tileType: 'soil',
+    );
+
+    // Hard
+    final hardData = await rootBundle.load('assets/tiles/tilemap_hard.png');
+    final hardCodec = await ui.instantiateImageCodec(
+      hardData.buffer.asUint8List(),
+    );
+    final hardFrame = await hardCodec.getNextFrame();
+    hardImage = hardFrame.image;
+
+    hardRects = generateAutoTileRects(
+      tilePixelSize: 64,
+      columns: 4,
+      startIndex: 0,
+      tileType: 'hard',
+    );
+  }
   // ============================================================
   // SAVE GARDEN
   // ============================================================
@@ -253,92 +298,100 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
 
     final notifier = ref.read(tileEditorProvider(gridSize).notifier);
     final state = ref.watch(tileEditorProvider(gridSize));
-    return Expanded(
-      child: Stack(
-        children: [
-          InteractiveViewer(
-            minScale: 0.2,
-            maxScale: 8,
-            boundaryMargin: const EdgeInsets.all(5000),
-            constrained: false,
-            child: Stack(
-              children: [
-                CustomPaint(
-                  size: Size(
-                    gridSize.width * tileSizePx,
-                    gridSize.height * tileSizePx,
-                  ),
-                  painter: GardenPainter(
-                    tiles: state.tiles,
-                    tileSize: tileSizePx,
-                    selectionStart: selectionStart,
-                    selectionEnd: selectionEnd,
-                  ),
+    if (soilImage == null ||
+        hardImage == null ||
+        soilRects == null ||
+        hardRects == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return Stack(
+      children: [
+        InteractiveViewer(
+          minScale: 0.2,
+          maxScale: 8,
+          boundaryMargin: const EdgeInsets.all(5000),
+          constrained: false,
+          child: Stack(
+            children: [
+              CustomPaint(
+                size: Size(
+                  gridSize.width * tileSizePx,
+                  gridSize.height * tileSizePx,
                 ),
+                painter: GardenPainter(
+                  tiles: state.tiles,
+                  tileSize: tileSizePx,
+                  selectionStart: selectionStart,
+                  selectionEnd: selectionEnd,
+                  soilImage: soilImage!,
+                  hardImage: hardImage!,
+                  soilRects: soilRects!,
+                  hardRects: hardRects!,
+                ),
+              ),
 
-                if (paintMode)
-                  Positioned.fill(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
+              if (paintMode)
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
 
-                      onTapDown: (d) {
-                        final x = (d.localPosition.dx / tileSizePx).floor();
-                        final y = (d.localPosition.dy / tileSizePx).floor();
-                        notifier.paintTile(x, y);
-                      },
+                    onTapDown: (d) {
+                      final x = (d.localPosition.dx / tileSizePx).floor();
+                      final y = (d.localPosition.dy / tileSizePx).floor();
+                      notifier.paintTile(x, y);
+                    },
 
-                      onDoubleTapDown: (d) {
-                        isSelecting = true;
-                        selectionStart = d.localPosition;
+                    onDoubleTapDown: (d) {
+                      isSelecting = true;
+                      selectionStart = d.localPosition;
+                      selectionEnd = d.localPosition;
+                      setState(() {});
+                    },
+
+                    onPanUpdate: (d) {
+                      if (isSelecting) {
                         selectionEnd = d.localPosition;
                         setState(() {});
-                      },
+                        return;
+                      }
 
-                      onPanUpdate: (d) {
-                        if (isSelecting) {
-                          selectionEnd = d.localPosition;
-                          setState(() {});
-                          return;
-                        }
+                      final x = (d.localPosition.dx / tileSizePx).floor();
+                      final y = (d.localPosition.dy / tileSizePx).floor();
 
-                        final x = (d.localPosition.dx / tileSizePx).floor();
-                        final y = (d.localPosition.dy / tileSizePx).floor();
+                      notifier.paintInterpolated(x, y);
+                    },
 
-                        notifier.paintInterpolated(x, y);
-                      },
+                    onPanEnd: (_) {
+                      notifier.endPaint();
 
-                      onPanEnd: (_) {
-                        notifier.endPaint();
+                      if (isSelecting &&
+                          selectionStart != null &&
+                          selectionEnd != null) {
+                        notifier.paintRectangle(
+                          selectionStart!,
+                          selectionEnd!,
+                          tileSizePx,
+                        );
 
-                        if (isSelecting &&
-                            selectionStart != null &&
-                            selectionEnd != null) {
-                          notifier.paintRectangle(
-                            selectionStart!,
-                            selectionEnd!,
-                            tileSizePx,
-                          );
-
-                          isSelecting = false;
-                          selectionStart = null;
-                          selectionEnd = null;
-                          setState(() {});
-                        }
-                      },
-                    ),
+                        isSelecting = false;
+                        selectionStart = null;
+                        selectionEnd = null;
+                        setState(() {});
+                      }
+                    },
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
+        ),
 
-          Positioned(
-            left: 20,
-            right: 20,
-            bottom: 20,
-            child: _buildBottomBar(notifier, state),
-          ),
-        ],
-      ),
+        Positioned(
+          left: 20,
+          right: 20,
+          bottom: 20,
+          child: _buildBottomBar(notifier, state),
+        ),
+      ],
     );
   }
 

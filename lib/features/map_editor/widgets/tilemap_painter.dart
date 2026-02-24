@@ -3,12 +3,83 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:hortus_app/features/map_editor/providers/tile_editor_notifier.dart';
 
+Map<int, Rect> generateAutoTileRects({
+  required int tilePixelSize,
+  required int columns,
+  required int startIndex,
+  required String tileType, // "soil" ou "hard"
+}) {
+  final map = <int, Rect>{};
+
+  for (int mask = 0; mask < 16; mask++) {
+    // 🔹 utiliser ton mapping
+    final mappedMask = tileType == "soil"
+        ? soilMaskToIndex[mask]!
+        : hardMaskToIndex[mask]!;
+
+    final index = startIndex + mappedMask;
+
+    final row = index ~/ columns;
+    final col = index % columns;
+
+    map[mask] = Rect.fromLTWH(
+      col * tilePixelSize.toDouble(),
+      row * tilePixelSize.toDouble(),
+      tilePixelSize.toDouble(),
+      tilePixelSize.toDouble(),
+    );
+  }
+
+  return map;
+}
+
+const Map<int, int> soilMaskToIndex = {
+  0: 33,
+  1: 23,
+  2: 30,
+  3: 20,
+  4: 3,
+  5: 13,
+  6: 0,
+  7: 10,
+  8: 32,
+  9: 22,
+  10: 31,
+  11: 21,
+  12: 2,
+  13: 12,
+  14: 1,
+  15: 11,
+};
+
+const Map<int, int> hardMaskToIndex = {
+  0: 19,
+  1: 11,
+  2: 16,
+  3: 8,
+  4: 3,
+  5: 7,
+  6: 0,
+  7: 4,
+  8: 18,
+  9: 10,
+  10: 17,
+  11: 9,
+  12: 2,
+  13: 6,
+  14: 1,
+  15: 5,
+};
+
 class GardenPainter extends CustomPainter {
   final List<List<TileType>> tiles;
   final double tileSize;
   final Offset? selectionStart;
   final Offset? selectionEnd;
-  final ui.Image tileImage;
+
+  final ui.Image soilImage;
+  final ui.Image hardImage;
+
   final Map<int, Rect> soilRects;
   final Map<int, Rect> hardRects;
 
@@ -17,7 +88,8 @@ class GardenPainter extends CustomPainter {
     required this.tileSize,
     this.selectionStart,
     this.selectionEnd,
-    required this.tileImage,
+    required this.soilImage,
+    required this.hardImage,
     required this.soilRects,
     required this.hardRects,
   });
@@ -54,20 +126,26 @@ class GardenPainter extends CustomPainter {
     for (int y = 0; y < tiles.length; y++) {
       for (int x = 0; x < tiles[y].length; x++) {
         final t = tiles[y][x];
-        if (t != TileType.empty) {
-          final color = t == TileType.soil
-              ? const Color.fromARGB(255, 57, 142, 52)
-              : t == TileType.hard
-              ? Color.fromARGB(255, 4, 99, 143)
-              : const Color.fromARGB(0, 4, 99, 143);
-          canvas.drawRect(
-            Rect.fromLTWH(x * tileSize, y * tileSize, tileSize, tileSize),
-            Paint()..color = color.withOpacity(0.7),
-          );
-        }
+
+        if (t == TileType.empty) continue;
+
+        final mask = computeMask(x, y);
+
+        final rectMap = t == TileType.soil ? soilRects : hardRects;
+        final image = t == TileType.soil ? soilImage : hardImage;
+
+        final srcRect = rectMap[mask]!;
+
+        final dstRect = Rect.fromLTWH(
+          x * tileSize,
+          y * tileSize,
+          tileSize,
+          tileSize,
+        );
+
+        canvas.drawImageRect(image, srcRect, dstRect, Paint());
       }
     }
-
     if (selectionStart != null && selectionEnd != null) {
       // Convertir en indices de tiles
       int startX = (selectionStart!.dx / tileSize).floor();
@@ -100,36 +178,28 @@ class GardenPainter extends CustomPainter {
     }
   }
 
+  int computeMask(int x, int y) {
+    final width = tiles[0].length;
+    final height = tiles.length;
+    final type = tiles[y][x];
+
+    int mask = 0;
+
+    // N
+    if (y > 0 && tiles[y - 1][x] == type) mask |= 1;
+
+    // E
+    if (x < width - 1 && tiles[y][x + 1] == type) mask |= 2;
+
+    // S
+    if (y < height - 1 && tiles[y + 1][x] == type) mask |= 4;
+
+    // W
+    if (x > 0 && tiles[y][x - 1] == type) mask |= 8;
+
+    return mask;
+  }
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
-
-int computeMask(List<List<TileType>> tiles, int x, int y) {
-  final width = tiles[0].length;
-  final height = tiles.length;
-  final type = tiles[y][x];
-
-  int mask = 0;
-
-  // Nord
-  if (y > 0 && tiles[y - 1][x] == type) {
-    mask |= 1;
-  }
-
-  // Est
-  if (x < width - 1 && tiles[y][x + 1] == type) {
-    mask |= 2;
-  }
-
-  // Sud
-  if (y < height - 1 && tiles[y + 1][x] == type) {
-    mask |= 4;
-  }
-
-  // Ouest
-  if (x > 0 && tiles[y][x - 1] == type) {
-    mask |= 8;
-  }
-
-  return mask;
 }
