@@ -105,21 +105,76 @@ class GardenPainter extends CustomPainter {
     canvas.drawRect(Offset(-5000, -5000) & sizePlus, rectBackgroundPaint);
 
     // Rectangle du jardin (jaune)
-    final rectPaint = Paint()
-      ..color = Colors.yellow
-      ..style = PaintingStyle.fill
-      ..strokeWidth = 2;
-    canvas.drawRect(Offset.zero & size, rectPaint);
+    const int topLeft = 5;
+    const int topRight = 7;
+    const int bottomLeft = 25;
+    const int bottomRight = 27;
 
-    // Quadrillage
-    final gridPaint = Paint()
-      ..color = Colors.black26
-      ..style = PaintingStyle.stroke;
-    for (double x = 0; x <= size.width; x += tileSize) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+    const int topEdge = 6;
+    const int bottomEdge = 26;
+    const int leftEdge = 15;
+    const int rightEdge = 17;
+
+    const int fillTile = 16;
+
+    Rect getTileRect(int index, int columns, int tilePixelSize) {
+      final row = index ~/ columns;
+      final col = index % columns;
+
+      return Rect.fromLTWH(
+        col * tilePixelSize.toDouble(),
+        row * tilePixelSize.toDouble(),
+        tilePixelSize.toDouble(),
+        tilePixelSize.toDouble(),
+      );
     }
-    for (double y = 0; y <= size.height; y += tileSize) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+
+    final int columns = 10;
+    final int tilePixelSize = 64;
+
+    final int tilesWide = (size.width / tileSize).floor();
+    final int tilesHigh = (size.height / tileSize).floor();
+
+    for (int y = 0; y < tilesHigh; y++) {
+      for (int x = 0; x < tilesWide; x++) {
+        int index;
+
+        final bool isTop = y == 0;
+        final bool isBottom = y == tilesHigh - 1;
+        final bool isLeft = x == 0;
+        final bool isRight = x == tilesWide - 1;
+
+        if (isTop && isLeft) {
+          index = topLeft;
+        } else if (isTop && isRight) {
+          index = topRight;
+        } else if (isBottom && isLeft) {
+          index = bottomLeft;
+        } else if (isBottom && isRight) {
+          index = bottomRight;
+        } else if (isTop) {
+          index = topEdge;
+        } else if (isBottom) {
+          index = bottomEdge;
+        } else if (isLeft) {
+          index = leftEdge;
+        } else if (isRight) {
+          index = rightEdge;
+        } else {
+          index = fillTile;
+        }
+
+        final srcRect = getTileRect(index, columns, tilePixelSize);
+
+        final dstRect = Rect.fromLTWH(
+          x * tileSize,
+          y * tileSize,
+          tileSize,
+          tileSize,
+        );
+
+        canvas.drawImageRect(soilImage, srcRect, dstRect, Paint());
+      }
     }
 
     // Dessiner les tiles existantes

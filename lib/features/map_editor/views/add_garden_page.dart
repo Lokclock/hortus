@@ -43,11 +43,18 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
   ui.Image? hardImage;
   Map<int, Rect>? soilRects;
   Map<int, Rect>? hardRects;
+  final TransformationController _transformationController =
+      TransformationController();
+
+  bool gridVisible = false;
 
   @override
   void initState() {
     super.initState();
     _tilesetFuture = loadTileset();
+    _transformationController.addListener(() {
+      setState(() {});
+    });
   }
 
   Future<void>? _tilesetFuture;
@@ -69,7 +76,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
     );
 
     // Hard
-    final hardData = await rootBundle.load('assets/tiles/tilemap_hard.png');
+    final hardData = await rootBundle.load('assets/tiles/tilemap_hard_v2.png');
     final hardCodec = await ui.instantiateImageCodec(
       hardData.buffer.asUint8List(),
     );
@@ -157,7 +164,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
 
   Widget _buildBottomBar(TileEditorNotifier notifier, TileEditorState state) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.85),
         borderRadius: BorderRadius.circular(30),
@@ -197,6 +204,9 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
           }),
           _toolButton(Icons.undo, Colors.white, false, notifier.undo),
           _toolButton(Icons.redo, Colors.white, false, notifier.redo),
+          _toolButton(Icons.grid_4x4, Colors.cyan, gridVisible, () {
+            setState(() => gridVisible = !gridVisible);
+          }),
         ],
       ),
     );
@@ -304,9 +314,11 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
         hardRects == null) {
       return const Center(child: CircularProgressIndicator());
     }
+    final zoom = _transformationController.value.getMaxScaleOnAxis();
     return Stack(
       children: [
         InteractiveViewer(
+          transformationController: _transformationController,
           minScale: 0.2,
           maxScale: 8,
           boundaryMargin: const EdgeInsets.all(5000),
@@ -384,6 +396,18 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
             ],
           ),
         ),
+        gridVisible
+            ? Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: BlueprintScalePainter(
+                      zoom: _transformationController.value.getMaxScaleOnAxis(),
+                      pixelsPerMeter: pixelsPerMeter,
+                    ),
+                  ),
+                ),
+              )
+            : SizedBox(),
 
         Positioned(
           left: 20,
@@ -441,5 +465,102 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
       appBar: _buildAppBar(),
       body: Form(key: _formKey, child: _buildBody()),
     );
+  }
+}
+
+class BlueprintScalePainter extends CustomPainter {
+  final double pixelsPerMeter;
+  final double zoom;
+
+  BlueprintScalePainter({required this.pixelsPerMeter, required this.zoom});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final ppm = pixelsPerMeter * zoom;
+
+    // Fond sombre
+    final bgPaint = Paint()..color = const ui.Color.fromARGB(15, 11, 30, 45);
+    canvas.drawRect(Offset.zero & size, bgPaint);
+
+    // Traits cyan fins
+    final linePaint = Paint()
+      ..color = Colors.cyanAccent.withOpacity(0.5)
+      ..strokeWidth = 1;
+
+    // Droites perpendiculaires au centre
+    final centerPaint = Paint()
+      ..color = Colors.cyanAccent.withOpacity(0.7)
+      ..strokeWidth = 2;
+    canvas.drawLine(
+      Offset(0, center.dy),
+      Offset(size.width, center.dy),
+      centerPaint,
+    );
+    canvas.drawLine(
+      Offset(center.dx, 0),
+      Offset(center.dx, size.height),
+      centerPaint,
+    );
+
+    // Texte
+    final textStyle = TextStyle(
+      color: Colors.cyanAccent.withOpacity(0.7),
+      fontSize: 10,
+    );
+    void drawText(String text, Offset pos) {
+      final tp = TextPainter(
+        text: TextSpan(text: text, style: textStyle),
+        textDirection: TextDirection.ltr,
+      );
+      tp.layout();
+      tp.paint(canvas, pos);
+    }
+
+    // Graduations
+    final fineSteps = [0.1, 0.2, 0.5]; // 10cm, 20cm, 50cm
+    final List<double> bigSteps = [1, 2, 5, 10, 20, 50, 100]; // mètres
+
+    void drawGraduations(List<double> steps) {
+      for (var g in steps) {
+        final stepPx = g * ppm;
+        if (stepPx < 5) continue; // pas visible si trop petit
+
+        // verticales
+        for (double dx = stepPx; dx < size.width / 2; dx += stepPx) {
+          for (var x in [center.dx + dx, center.dx - dx]) {
+            if (x < 0 || x > size.width) continue;
+            canvas.drawLine(Offset(x, 0), Offset(x, size.height), linePaint);
+            final dist = g * ((x - center.dx) / stepPx).abs();
+            final label = dist < 1
+                ? "${(dist * 100).round()}cm"
+                : "${dist.toStringAsFixed(0)}m";
+            drawText(label, Offset(x + 2, center.dy + 2));
+          }
+        }
+
+        // horizontales
+        for (double dy = stepPx; dy < size.height / 2; dy += stepPx) {
+          for (var y in [center.dy + dy, center.dy - dy]) {
+            if (y < 0 || y > size.height) continue;
+            canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
+            final dist = g * ((y - center.dy) / stepPx).abs();
+            final label = dist < 1
+                ? "${(dist * 100).round()}cm"
+                : "${dist.toStringAsFixed(0)}m";
+            drawText(label, Offset(center.dx + 2, y + 2));
+          }
+        }
+      }
+    }
+
+    drawGraduations(fineSteps);
+    drawGraduations(bigSteps);
+  }
+
+  @override
+  bool shouldRepaint(covariant BlueprintScalePainter oldDelegate) {
+    return oldDelegate.zoom != zoom ||
+        oldDelegate.pixelsPerMeter != pixelsPerMeter;
   }
 }
