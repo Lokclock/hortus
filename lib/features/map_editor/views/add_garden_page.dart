@@ -480,7 +480,7 @@ class BlueprintScalePainter extends CustomPainter {
     final ppm = pixelsPerMeter * zoom;
 
     // Fond sombre
-    final bgPaint = Paint()..color = const ui.Color.fromARGB(15, 11, 30, 45);
+    final bgPaint = Paint()..color = const ui.Color.fromARGB(14, 11, 30, 45);
     canvas.drawRect(Offset.zero & size, bgPaint);
 
     // Traits cyan fins
@@ -504,10 +504,7 @@ class BlueprintScalePainter extends CustomPainter {
     );
 
     // Texte
-    final textStyle = TextStyle(
-      color: Colors.cyanAccent.withOpacity(0.7),
-      fontSize: 10,
-    );
+    final textStyle = TextStyle(color: Colors.cyanAccent, fontSize: 15);
     void drawText(String text, Offset pos) {
       final tp = TextPainter(
         text: TextSpan(text: text, style: textStyle),
@@ -521,21 +518,34 @@ class BlueprintScalePainter extends CustomPainter {
     final fineSteps = [0.1, 0.2, 0.5]; // 10cm, 20cm, 50cm
     final List<double> bigSteps = [1, 2, 5, 10, 20, 50, 100]; // mètres
 
-    void drawGraduations(List<double> steps) {
+    void drawGraduations(List<double> steps, {required bool isBig}) {
+      final graduationsText = [
+        0.1,
+        0.2,
+        0.5,
+        1,
+        2,
+        5,
+        10,
+        20,
+        50,
+        100,
+      ]; // en mètres
+
       for (var g in steps) {
         final stepPx = g * ppm;
-        if (stepPx < 5) continue; // pas visible si trop petit
+        if (stepPx < 40) continue;
 
         // verticales
         for (double dx = stepPx; dx < size.width / 2; dx += stepPx) {
           for (var x in [center.dx + dx, center.dx - dx]) {
             if (x < 0 || x > size.width) continue;
             canvas.drawLine(Offset(x, 0), Offset(x, size.height), linePaint);
-            final dist = g * ((x - center.dx) / stepPx).abs();
-            final label = dist < 1
-                ? "${(dist * 100).round()}cm"
-                : "${dist.toStringAsFixed(0)}m";
-            drawText(label, Offset(x + 2, center.dy + 2));
+
+            // texte uniquement pour graduations importantes
+            if (graduationsText.contains(g)) {
+              drawText(formatLabel(g), Offset(x + 2, center.dy + 2));
+            }
           }
         }
 
@@ -544,23 +554,30 @@ class BlueprintScalePainter extends CustomPainter {
           for (var y in [center.dy + dy, center.dy - dy]) {
             if (y < 0 || y > size.height) continue;
             canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
-            final dist = g * ((y - center.dy) / stepPx).abs();
-            final label = dist < 1
-                ? "${(dist * 100).round()}cm"
-                : "${dist.toStringAsFixed(0)}m";
-            drawText(label, Offset(center.dx + 2, y + 2));
+
+            if (graduationsText.contains(g)) {
+              drawText(formatLabel(g), Offset(center.dx + 2, y + 2));
+            }
           }
         }
       }
     }
 
-    drawGraduations(fineSteps);
-    drawGraduations(bigSteps);
+    drawGraduations(fineSteps, isBig: false);
+    drawGraduations(bigSteps, isBig: true);
   }
 
   @override
   bool shouldRepaint(covariant BlueprintScalePainter oldDelegate) {
     return oldDelegate.zoom != zoom ||
         oldDelegate.pixelsPerMeter != pixelsPerMeter;
+  }
+}
+
+String formatLabel(double meters) {
+  if (meters < 1) {
+    return "${(meters * 100).round()}cm";
+  } else {
+    return "${meters.toStringAsFixed(0)}m";
   }
 }
