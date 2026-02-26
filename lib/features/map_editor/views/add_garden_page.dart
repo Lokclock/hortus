@@ -314,7 +314,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
         hardRects == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    final zoom = _transformationController.value.getMaxScaleOnAxis();
+
     return Stack(
       children: [
         InteractiveViewer(
