@@ -474,110 +474,225 @@ class BlueprintScalePainter extends CustomPainter {
 
   BlueprintScalePainter({required this.pixelsPerMeter, required this.zoom});
 
+  // ============================================================
+  // CONFIG
+  // ============================================================
+
+  static const List<double> _steps = [
+    0.1,
+    0.2,
+    0.5,
+    1,
+    2,
+    5,
+    10,
+    20,
+    50,
+    100,
+    200,
+    500,
+    1000,
+  ];
+
+  static const double _minReadablePx = 60;
+
+  // ============================================================
+  // STEP SELECTION
+  // ============================================================
+
+  double _chooseMainStep(double ppm) {
+    for (final step in _steps) {
+      if (step * ppm >= _minReadablePx) {
+        return step;
+      }
+    }
+    return _steps.last;
+  }
+
+  List<double> _subdivisionsFor(double step) {
+    if (step <= 0.1) return const [];
+
+    if (step == 0.2) return const [0.1];
+    if (step == 0.5) return const [0.1];
+    if (step == 1) return const [0.1];
+    if (step == 2) return const [0.5];
+    if (step == 5) return const [1];
+    if (step == 10) return const [1];
+    if (step == 20) return const [5];
+    if (step == 50) return const [10];
+    if (step == 100) return const [20];
+
+    return const [];
+  }
+
+  // ============================================================
+  // PAINT
+  // ============================================================
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final ppm = pixelsPerMeter * zoom;
 
-    // Fond sombre
-    final bgPaint = Paint()..color = const ui.Color.fromARGB(14, 11, 30, 45);
-    canvas.drawRect(Offset.zero & size, bgPaint);
+    final mainStep = _chooseMainStep(ppm);
+    final subSteps = _subdivisionsFor(mainStep);
 
-    // Traits cyan fins
-    final linePaint = Paint()
-      ..color = Colors.cyanAccent.withOpacity(0.5)
+    // ------------------------------------------------------------
+    // Background
+    // ------------------------------------------------------------
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = const ui.Color.fromARGB(15, 11, 30, 45),
+    );
+
+    // ------------------------------------------------------------
+    // Subdivisions (fine grid)
+    // ------------------------------------------------------------
+    final subPaint = Paint()
+      ..color = Colors.cyanAccent.withOpacity(0.15)
       ..strokeWidth = 1;
 
-    // Droites perpendiculaires au centre
-    final centerPaint = Paint()
+    for (final sub in subSteps) {
+      final stepPx = sub * ppm;
+      if (stepPx < 20) continue;
+
+      _drawGrid(canvas, size, center, stepPx, subPaint);
+    }
+
+    // ------------------------------------------------------------
+    // Main grid
+    // ------------------------------------------------------------
+    final mainPaint = Paint()
+      ..color = Colors.cyanAccent.withOpacity(0.35)
+      ..strokeWidth = 1.5;
+
+    final mainStepPx = mainStep * ppm;
+    _drawGrid(canvas, size, center, mainStepPx, mainPaint);
+
+    // ------------------------------------------------------------
+    // Axes
+    // ------------------------------------------------------------
+    final axisPaint = Paint()
       ..color = Colors.cyanAccent.withOpacity(0.7)
       ..strokeWidth = 2;
+
     canvas.drawLine(
       Offset(0, center.dy),
       Offset(size.width, center.dy),
-      centerPaint,
+      axisPaint,
     );
     canvas.drawLine(
       Offset(center.dx, 0),
       Offset(center.dx, size.height),
-      centerPaint,
+      axisPaint,
     );
 
-    // Texte
-    final textStyle = TextStyle(color: Colors.cyanAccent, fontSize: 15);
-    void drawText(String text, Offset pos) {
-      final tp = TextPainter(
-        text: TextSpan(text: text, style: textStyle),
-        textDirection: TextDirection.ltr,
-      );
+    // ------------------------------------------------------------
+    // Labels (ONLY main step)
+    // ------------------------------------------------------------
+    final textStyle = TextStyle(
+      color: Colors.cyanAccent.withOpacity(1),
+      fontSize: 14,
+    );
+
+    final tp = TextPainter(textDirection: TextDirection.ltr);
+
+    void drawLabel(String text, Offset pos) {
+      tp.text = TextSpan(text: text, style: textStyle);
       tp.layout();
       tp.paint(canvas, pos);
     }
 
-    // Graduations
-    final fineSteps = [0.1, 0.2, 0.5]; // 10cm, 20cm, 50cm
-    final List<double> bigSteps = [1, 2, 5, 10, 20, 50, 100]; // mètres
+    int i = 1;
 
-    void drawGraduations(List<double> steps, {required bool isBig}) {
-      final graduationsText = [
-        0.1,
-        0.2,
-        0.5,
-        1,
-        2,
-        5,
-        10,
-        20,
-        50,
-        100,
-      ]; // en mètres
-
-      for (var g in steps) {
-        final stepPx = g * ppm;
-        if (stepPx < 45) continue;
-
-        // verticales
-        for (double dx = stepPx; dx < size.width / 2; dx += stepPx) {
-          for (var x in [center.dx + dx, center.dx - dx]) {
-            if (x < 0 || x > size.width) continue;
-            canvas.drawLine(Offset(x, 0), Offset(x, size.height), linePaint);
-
-            // texte uniquement pour graduations importantes
-            if (graduationsText.contains(g)) {
-              drawText(formatLabel(g), Offset(x + 2, center.dy + 2));
-            }
-          }
-        }
-
-        // horizontales
-        for (double dy = stepPx; dy < size.height / 2; dy += stepPx) {
-          for (var y in [center.dy + dy, center.dy - dy]) {
-            if (y < 0 || y > size.height) continue;
-            canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
-
-            if (graduationsText.contains(g)) {
-              drawText(formatLabel(g), Offset(center.dx + 2, y + 2));
-            }
-          }
-        }
-      }
+    for (double dx = mainStepPx; dx < size.width / 2; dx += mainStepPx, i++) {
+      final distance = i * mainStep;
+      drawLabel(
+        _formatStep(distance),
+        Offset(center.dx + dx + 4, center.dy + 4),
+      );
     }
 
-    drawGraduations(fineSteps, isBig: false);
-    drawGraduations(bigSteps, isBig: true);
+    i = 1;
+    for (double dx = mainStepPx; dx < size.width / 2; dx += mainStepPx, i++) {
+      final distance = i * mainStep;
+      drawLabel(
+        _formatStep(distance),
+        Offset(center.dx - dx + 4, center.dy + 4),
+      );
+    }
+
+    int j = 1;
+
+    for (double dy = mainStepPx; dy < size.height / 2; dy += mainStepPx, j++) {
+      final distance = j * mainStep;
+      drawLabel(
+        _formatStep(distance),
+        Offset(center.dx + 4, center.dy + dy + 4),
+      );
+    }
+
+    j = 1;
+    for (double dy = mainStepPx; dy < size.height / 2; dy += mainStepPx, j++) {
+      final distance = j * mainStep;
+      drawLabel(
+        _formatStep(distance),
+        Offset(center.dx + 4, center.dy - dy + 4),
+      );
+    }
+  }
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+
+  void _drawGrid(
+    Canvas canvas,
+    Size size,
+    Offset center,
+    double stepPx,
+    Paint paint,
+  ) {
+    for (double dx = stepPx; dx < size.width / 2; dx += stepPx) {
+      canvas.drawLine(
+        Offset(center.dx + dx, 0),
+        Offset(center.dx + dx, size.height),
+        paint,
+      );
+      canvas.drawLine(
+        Offset(center.dx - dx, 0),
+        Offset(center.dx - dx, size.height),
+        paint,
+      );
+    }
+
+    for (double dy = stepPx; dy < size.height / 2; dy += stepPx) {
+      canvas.drawLine(
+        Offset(0, center.dy + dy),
+        Offset(size.width, center.dy + dy),
+        paint,
+      );
+      canvas.drawLine(
+        Offset(0, center.dy - dy),
+        Offset(size.width, center.dy - dy),
+        paint,
+      );
+    }
+  }
+
+  String _formatStep(double meters) {
+    if (meters < 1) {
+      return '${(meters * 100).round()}cm';
+    }
+    if (meters >= 1000) {
+      return '${(meters / 1000).round()}km';
+    }
+    return '${meters.round()}m';
   }
 
   @override
   bool shouldRepaint(covariant BlueprintScalePainter oldDelegate) {
     return oldDelegate.zoom != zoom ||
         oldDelegate.pixelsPerMeter != pixelsPerMeter;
-  }
-}
-
-String formatLabel(double meters) {
-  if (meters < 1) {
-    return "${(meters * 100).round()}cm";
-  } else {
-    return "${meters.toStringAsFixed(0)}m";
   }
 }
