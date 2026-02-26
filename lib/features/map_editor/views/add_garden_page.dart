@@ -534,7 +534,7 @@ class BlueprintScalePainter extends CustomPainter {
 
       for (var g in steps) {
         final stepPx = g * ppm;
-        if (stepPx < 40) continue;
+        if (stepPx < 45) continue;
 
         // verticales
         for (double dx = stepPx; dx < size.width / 2; dx += stepPx) {
