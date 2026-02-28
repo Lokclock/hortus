@@ -7,12 +7,15 @@ import 'package:hortus_app/features/map_editor/widgets/tilemap_painter.dart';
 import '../../gardens/providers/garden_providers.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../../core/services/firebase_providers.dart';
+import 'package:vector_math/vector_math_64.dart' show Vector3;
 
 enum EditorScreen {
   choice, // aucune image
   image, // image affichée mais pas en édition
   tileEditor, // mode édition actif
 }
+
+enum ViewMode { panZoom, rotate }
 
 class AddGardenPage extends ConsumerStatefulWidget {
   const AddGardenPage({super.key});
@@ -43,18 +46,118 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
   ui.Image? hardImage;
   Map<int, Rect>? soilRects;
   Map<int, Rect>? hardRects;
-  final TransformationController _transformationController =
-      TransformationController();
 
   bool gridVisible = false;
+
+  Matrix4 _transform = Matrix4.identity();
+
+  double _scale = 1.0;
+  double _rotation = 0.0;
+  Offset _translation = Offset.zero;
+
+  late Offset _lastFocalPoint;
+  late double _startScale;
+  late double _startRotation;
+  late Offset _startTranslation;
+
+  Size _viewportSize = Size.zero;
+
+  ViewMode _viewMode = ViewMode.panZoom;
+
+  ui.Image? _backgroundCache;
+  Size? _backgroundCacheSize;
+  bool _isBuildingCache = false;
 
   @override
   void initState() {
     super.initState();
     _tilesetFuture = loadTileset();
-    _transformationController.addListener(() {
-      setState(() {});
+  }
+
+  Offset _screenToWorld(Offset screenPos) {
+    final inv = Matrix4.inverted(_transform);
+    return MatrixUtils.transformPoint(inv, screenPos);
+  }
+
+  Future<void> _rebuildBackgroundCache(Size size, GardenPainter painter) async {
+    if (_isBuildingCache) return;
+
+    _isBuildingCache = true;
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+
+    // Dessin du fond UNIQUEMENT
+    for (int y = 0; y < painter.tilesHigh; y++) {
+      for (int x = 0; x < painter.tilesWide; x++) {
+        final isTop = y == 0;
+        final isBottom = y == painter.tilesHigh - 1;
+        final isLeft = x == 0;
+        final isRight = x == painter.tilesWide - 1;
+
+        int index;
+        if (isTop && isLeft)
+          index = 5;
+        else if (isTop && isRight)
+          index = 7;
+        else if (isBottom && isLeft)
+          index = 25;
+        else if (isBottom && isRight)
+          index = 27;
+        else if (isTop)
+          index = 6;
+        else if (isBottom)
+          index = 26;
+        else if (isLeft)
+          index = 15;
+        else if (isRight)
+          index = 17;
+        else
+          index = 16;
+
+        final srcRect = Rect.fromLTWH(
+          (index % 10) * 64,
+          (index ~/ 10) * 64,
+          64,
+          64,
+        );
+
+        canvas.drawImageRect(
+          painter.soilImage,
+          srcRect,
+          Rect.fromLTWH(
+            x * painter.tileSize,
+            y * painter.tileSize,
+            painter.tileSize,
+            painter.tileSize,
+          ),
+          Paint(),
+        );
+      }
+    }
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size.width.ceil(), size.height.ceil());
+
+    if (!mounted) return;
+
+    setState(() {
+      _backgroundCache = image;
+      _backgroundCacheSize = size;
+      _isBuildingCache = false;
     });
+  }
+
+  Rect _computeVisibleWorldRect() {
+    final inv = Matrix4.inverted(_transform);
+
+    final topLeft = MatrixUtils.transformPoint(inv, Offset.zero);
+    final bottomRight = MatrixUtils.transformPoint(
+      inv,
+      Offset(_viewportSize.width, _viewportSize.height),
+    );
+
+    return Rect.fromPoints(topLeft, bottomRight);
   }
 
   Future<void>? _tilesetFuture;
@@ -169,44 +272,73 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
         color: Colors.black.withOpacity(0.85),
         borderRadius: BorderRadius.circular(30),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      child: Column(
         children: [
-          _toolButton(
-            Icons.grass,
-            Colors.brown,
-            state.currentBrush == TileType.soil && paintMode,
-            () {
-              notifier.setBrush(TileType.soil);
-              setState(() => paintMode = true);
-            },
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _toolButton(
+                Icons.grass,
+                Colors.brown,
+                state.currentBrush == TileType.soil && paintMode,
+                () {
+                  notifier.setBrush(TileType.soil);
+                  setState(() => paintMode = true);
+                },
+              ),
+              _toolButton(
+                Icons.square,
+                Colors.grey,
+                state.currentBrush == TileType.hard && paintMode,
+                () {
+                  notifier.setBrush(TileType.hard);
+                  setState(() => paintMode = true);
+                },
+              ),
+              _toolButton(
+                Icons.delete,
+                Colors.red,
+                state.currentBrush == TileType.empty && paintMode,
+                () {
+                  notifier.setBrush(TileType.empty);
+                  setState(() => paintMode = true);
+                },
+              ),
+              _toolButton(
+                Icons.zoom_in_map,
+                Colors.blue,
+                !paintMode && _viewMode == ViewMode.panZoom,
+                () {
+                  setState(() => paintMode = false);
+                  setState(() => _viewMode = ViewMode.panZoom);
+                },
+              ),
+              _toolButton(
+                Icons.rotate_90_degrees_cw_sharp,
+                Colors.blue,
+                !paintMode && _viewMode == ViewMode.rotate,
+                () {
+                  setState(() => paintMode = false);
+                  setState(() => _viewMode = ViewMode.rotate);
+                },
+              ),
+              _toolButton(Icons.reset_tv_rounded, Colors.blue, false, () {
+                resetView();
+              }),
+            ],
           ),
-          _toolButton(
-            Icons.square,
-            Colors.grey,
-            state.currentBrush == TileType.hard && paintMode,
-            () {
-              notifier.setBrush(TileType.hard);
-              setState(() => paintMode = true);
-            },
+          SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _toolButton(Icons.undo, Colors.white, false, notifier.undo),
+              _toolButton(Icons.redo, Colors.white, false, notifier.redo),
+              _toolButton(Icons.grid_4x4, Colors.cyan, gridVisible, () {
+                setState(() => gridVisible = !gridVisible);
+              }),
+              _toolButton(Icons.layers, Colors.cyan, false, () {}),
+            ],
           ),
-          _toolButton(
-            Icons.delete,
-            Colors.red,
-            state.currentBrush == TileType.empty && paintMode,
-            () {
-              notifier.setBrush(TileType.empty);
-              setState(() => paintMode = true);
-            },
-          ),
-          _toolButton(Icons.pan_tool, Colors.blue, !paintMode, () {
-            setState(() => paintMode = false);
-          }),
-          _toolButton(Icons.undo, Colors.white, false, notifier.undo),
-          _toolButton(Icons.redo, Colors.white, false, notifier.redo),
-          _toolButton(Icons.grid_4x4, Colors.cyan, gridVisible, () {
-            setState(() => gridVisible = !gridVisible);
-          }),
         ],
       ),
     );
@@ -302,12 +434,42 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
     );
   }
 
+  void _updateTransform() {
+    // On veut que le zoom se fasse autour du centre du viewport
+    final center = Vector3(
+      _viewportSize.width / 2,
+      _viewportSize.height / 2,
+      0,
+    );
+
+    _transform = Matrix4.identity()
+      ..translateByVector3(center) // on déplace le centre au milieu
+      ..scaleByDouble(1.0, 1.0, 1.0, _scale) // on applique le zoom
+      ..rotateZ(_rotation) // rotation si besoin
+      ..translateByVector3(
+        Vector3(-center.x + _translation.dx, -center.y + _translation.dy, 0),
+      );
+  }
+
+  void resetView() {
+    setState(() {
+      _scale = 1;
+      _rotation = 0;
+      _translation = Offset.zero;
+      _updateTransform();
+      _viewMode = ViewMode.panZoom;
+    });
+  }
+
   Widget tileMapEditor() {
     final gridSize = _computeGridSize();
     final tileSizePx = tileSizeMeters * pixelsPerMeter;
 
     final notifier = ref.read(tileEditorProvider(gridSize).notifier);
     final state = ref.watch(tileEditorProvider(gridSize));
+
+    final visibleRect = _computeVisibleWorldRect();
+
     if (soilImage == null ||
         hardImage == null ||
         soilRects == null ||
@@ -315,93 +477,184 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    final painter = GardenPainter(
+      viewportSize: _viewportSize,
+      screenToWorld: _screenToWorld,
+      tiles: state.tiles,
+      tileSize: tileSizePx,
+      soilImage: soilImage!,
+      hardImage: hardImage!,
+      soilRects: soilRects!,
+      hardRects: hardRects!,
+      tilesWide: gridSize.width.toInt(),
+      tilesHigh: gridSize.height.toInt(),
+      visibleRect: visibleRect,
+      backgroundCache: _backgroundCache,
+      selectionStart: selectionStart,
+      selectionEnd: selectionEnd,
+    );
+
+    final canvasSize = Size(
+      gridSize.width * tileSizePx,
+      gridSize.height * tileSizePx,
+    );
+
+    if ((_backgroundCache == null || _backgroundCacheSize != canvasSize) &&
+        !_isBuildingCache) {
+      _rebuildBackgroundCache(canvasSize, painter);
+    }
+
     return Stack(
       children: [
-        InteractiveViewer(
-          transformationController: _transformationController,
-          minScale: 0.2,
-          maxScale: 8,
-          boundaryMargin: const EdgeInsets.all(5000),
-          constrained: false,
-          child: Stack(
-            children: [
-              CustomPaint(
-                size: Size(
-                  gridSize.width * tileSizePx,
-                  gridSize.height * tileSizePx,
-                ),
-                painter: GardenPainter(
-                  tiles: state.tiles,
-                  tileSize: tileSizePx,
-                  selectionStart: selectionStart,
-                  selectionEnd: selectionEnd,
-                  soilImage: soilImage!,
-                  hardImage: hardImage!,
-                  soilRects: soilRects!,
-                  hardRects: hardRects!,
+        LayoutBuilder(
+          builder: (context, constraints) {
+            _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onScaleStart: paintMode
+                  ? null
+                  : (details) {
+                      _lastFocalPoint = details.focalPoint;
+                      _startScale = _scale;
+                      _startRotation = _rotation;
+                      _startTranslation = _translation;
+                    },
+              onScaleUpdate: paintMode
+                  ? null
+                  : (details) {
+                      setState(() {
+                        if (_viewMode == ViewMode.panZoom) {
+                          // --- Nouveau scale ---
+                          final newScale = (_startScale * (1 / details.scale))
+                              .clamp(0.4, 8.0);
+
+                          // --- Coordonnée monde du point focal AVANT zoom ---
+                          final focalWorldBefore = _screenToWorld(
+                            details.focalPoint,
+                          );
+
+                          // --- Appliquer le nouveau scale ---
+                          _scale = newScale;
+
+                          // --- Coordonnée monde du point focal APRÈS zoom ---
+                          final focalWorldAfter = _screenToWorld(
+                            details.focalPoint,
+                          );
+
+                          // --- Ajuste la translation pour que le point focal reste fixe ---
+                          _translation += (focalWorldBefore - focalWorldAfter);
+
+                          // --- Pan uniforme, en tenant compte du zoom ---
+                          final delta =
+                              (details.focalPoint - _lastFocalPoint) * _scale;
+                          _translation += delta;
+
+                          _lastFocalPoint = details.focalPoint;
+                        }
+
+                        if (_viewMode == ViewMode.rotate) {
+                          _rotation = _startRotation + details.rotation;
+                          final delta =
+                              (details.focalPoint - _lastFocalPoint) * _scale;
+                          _translation += delta;
+                          _lastFocalPoint = details.focalPoint;
+                        }
+                        _updateTransform();
+                      });
+                    },
+              child: SizedBox.expand(
+                child: Stack(
+                  children: [
+                    Transform(
+                      transform: _transform,
+                      child: CustomPaint(
+                        size: Size(
+                          gridSize.width * tileSizePx,
+                          gridSize.height * tileSizePx,
+                        ),
+                        painter: painter,
+                      ),
+                    ),
+                    if (paintMode)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.translucent,
+
+                          onTapDown: (d) {
+                            final worldPos = _screenToWorld(
+                              (context.findRenderObject() as RenderBox)
+                                  .globalToLocal(d.globalPosition),
+                            );
+
+                            final x = (worldPos.dx / tileSizePx).floor();
+                            final y = (worldPos.dy / tileSizePx).floor();
+                            notifier.paintTile(x, y);
+                          },
+
+                          onDoubleTapDown: (d) {
+                            isSelecting = true;
+                            selectionStart = _screenToWorld(
+                              (context.findRenderObject() as RenderBox)
+                                  .globalToLocal(d.globalPosition),
+                            );
+                            selectionEnd = selectionStart;
+                            setState(() {});
+                          },
+
+                          onPanUpdate: (d) {
+                            if (isSelecting) {
+                              selectionEnd = _screenToWorld(
+                                (context.findRenderObject() as RenderBox)
+                                    .globalToLocal(d.globalPosition),
+                              );
+                              setState(() {});
+                              return;
+                            }
+
+                            final worldPos = _screenToWorld(
+                              (context.findRenderObject() as RenderBox)
+                                  .globalToLocal(d.globalPosition),
+                            );
+
+                            final x = (worldPos.dx / tileSizePx).floor();
+                            final y = (worldPos.dy / tileSizePx).floor();
+
+                            notifier.paintInterpolated(x, y);
+                          },
+
+                          onPanEnd: (_) {
+                            notifier.endPaint();
+
+                            if (isSelecting &&
+                                selectionStart != null &&
+                                selectionEnd != null) {
+                              notifier.paintRectangle(
+                                selectionStart!,
+                                selectionEnd!,
+                                tileSizePx,
+                              );
+
+                              isSelecting = false;
+                              selectionStart = null;
+                              selectionEnd = null;
+                              setState(() {});
+                            }
+                          },
+                        ),
+                      ),
+                  ],
                 ),
               ),
-
-              if (paintMode)
-                Positioned.fill(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-
-                    onTapDown: (d) {
-                      final x = (d.localPosition.dx / tileSizePx).floor();
-                      final y = (d.localPosition.dy / tileSizePx).floor();
-                      notifier.paintTile(x, y);
-                    },
-
-                    onDoubleTapDown: (d) {
-                      isSelecting = true;
-                      selectionStart = d.localPosition;
-                      selectionEnd = d.localPosition;
-                      setState(() {});
-                    },
-
-                    onPanUpdate: (d) {
-                      if (isSelecting) {
-                        selectionEnd = d.localPosition;
-                        setState(() {});
-                        return;
-                      }
-
-                      final x = (d.localPosition.dx / tileSizePx).floor();
-                      final y = (d.localPosition.dy / tileSizePx).floor();
-
-                      notifier.paintInterpolated(x, y);
-                    },
-
-                    onPanEnd: (_) {
-                      notifier.endPaint();
-
-                      if (isSelecting &&
-                          selectionStart != null &&
-                          selectionEnd != null) {
-                        notifier.paintRectangle(
-                          selectionStart!,
-                          selectionEnd!,
-                          tileSizePx,
-                        );
-
-                        isSelecting = false;
-                        selectionStart = null;
-                        selectionEnd = null;
-                        setState(() {});
-                      }
-                    },
-                  ),
-                ),
-            ],
-          ),
+            );
+          },
         ),
         gridVisible
             ? Positioned.fill(
                 child: IgnorePointer(
                   child: CustomPaint(
                     painter: BlueprintScalePainter(
-                      zoom: _transformationController.value.getMaxScaleOnAxis(),
+                      zoom: _scale,
                       pixelsPerMeter: pixelsPerMeter,
                     ),
                   ),
@@ -464,6 +717,9 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
     return Scaffold(
       appBar: _buildAppBar(),
       body: Form(key: _formKey, child: _buildBody()),
+      backgroundColor: EditorScreen.tileEditor == screen
+          ? const ui.Color.fromARGB(235, 150, 208, 255)
+          : Colors.white.withOpacity(0.9),
     );
   }
 }

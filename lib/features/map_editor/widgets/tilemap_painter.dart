@@ -83,6 +83,15 @@ class GardenPainter extends CustomPainter {
   final Map<int, Rect> soilRects;
   final Map<int, Rect> hardRects;
 
+  final int tilesWide;
+  final int tilesHigh;
+
+  final Rect visibleRect;
+  final ui.Image? backgroundCache;
+
+  final Size viewportSize;
+  final Offset Function(Offset) screenToWorld;
+
   GardenPainter({
     required this.tiles,
     required this.tileSize,
@@ -92,94 +101,52 @@ class GardenPainter extends CustomPainter {
     required this.hardImage,
     required this.soilRects,
     required this.hardRects,
+    required this.tilesWide,
+    required this.tilesHigh,
+    required this.visibleRect,
+    required this.backgroundCache,
+    required this.viewportSize,
+    required this.screenToWorld,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Fond bleu sur tout l'écran
-    final sizePlus = Size(size.width + 10000, size.height + 10000);
-    final rectBackgroundPaint = Paint()
-      ..color = Colors.blue.shade300
-      ..style = PaintingStyle.fill
-      ..strokeWidth = 2;
-    canvas.drawRect(Offset(-5000, -5000) & sizePlus, rectBackgroundPaint);
-
-    // Rectangle du jardin (jaune)
-    const int topLeft = 5;
-    const int topRight = 7;
-    const int bottomLeft = 25;
-    const int bottomRight = 27;
-
-    const int topEdge = 6;
-    const int bottomEdge = 26;
-    const int leftEdge = 15;
-    const int rightEdge = 17;
-
-    const int fillTile = 16;
-
-    Rect getTileRect(int index, int columns, int tilePixelSize) {
-      final row = index ~/ columns;
-      final col = index % columns;
-
-      return Rect.fromLTWH(
-        col * tilePixelSize.toDouble(),
-        row * tilePixelSize.toDouble(),
-        tilePixelSize.toDouble(),
-        tilePixelSize.toDouble(),
+    // ---- Fond (cache)
+    if (backgroundCache != null) {
+      canvas.drawImage(backgroundCache!, Offset.zero, Paint());
+    } else {
+      canvas.drawRect(
+        Offset.zero & size,
+        Paint()..color = const ui.Color.fromARGB(255, 228, 123, 88),
       );
     }
 
-    final int columns = 10;
-    final int tilePixelSize = 64;
+    // ---- Culling
+    // ---- Culling corrigé pour rotation
+    final corners = [
+      Offset(0, 0),
+      Offset(viewportSize.width, 0),
+      Offset(0, viewportSize.height),
+      Offset(viewportSize.width, viewportSize.height),
+    ];
 
-    final int tilesWide = (size.width / tileSize).floor();
-    final int tilesHigh = (size.height / tileSize).floor();
+    // Convertir les coins écran → monde
+    final worldCorners = corners.map(screenToWorld).toList();
 
-    for (int y = 0; y < tilesHigh; y++) {
-      for (int x = 0; x < tilesWide; x++) {
-        int index;
+    // Trouver les min/max X et Y
+    final minX = worldCorners.map((p) => p.dx).reduce((a, b) => a < b ? a : b);
+    final maxX = worldCorners.map((p) => p.dx).reduce((a, b) => a > b ? a : b);
+    final minY = worldCorners.map((p) => p.dy).reduce((a, b) => a < b ? a : b);
+    final maxY = worldCorners.map((p) => p.dy).reduce((a, b) => a > b ? a : b);
 
-        final bool isTop = y == 0;
-        final bool isBottom = y == tilesHigh - 1;
-        final bool isLeft = x == 0;
-        final bool isRight = x == tilesWide - 1;
+    final startX = (minX / tileSize).floor().clamp(0, tilesWide - 1);
+    final endX = (maxX / tileSize).ceil().clamp(0, tilesWide - 1);
+    final startY = (minY / tileSize).floor().clamp(0, tilesHigh - 1);
+    final endY = (maxY / tileSize).ceil().clamp(0, tilesHigh - 1);
 
-        if (isTop && isLeft) {
-          index = topLeft;
-        } else if (isTop && isRight) {
-          index = topRight;
-        } else if (isBottom && isLeft) {
-          index = bottomLeft;
-        } else if (isBottom && isRight) {
-          index = bottomRight;
-        } else if (isTop) {
-          index = topEdge;
-        } else if (isBottom) {
-          index = bottomEdge;
-        } else if (isLeft) {
-          index = leftEdge;
-        } else if (isRight) {
-          index = rightEdge;
-        } else {
-          index = fillTile;
-        }
-
-        final srcRect = getTileRect(index, columns, tilePixelSize);
-
-        final dstRect = Rect.fromLTWH(
-          x * tileSize,
-          y * tileSize,
-          tileSize,
-          tileSize,
-        );
-
-        canvas.drawImageRect(soilImage, srcRect, dstRect, Paint());
-      }
-    }
-
-    // Dessiner les tiles existantes
-    for (int y = 0; y < tiles.length; y++) {
-      for (int x = 0; x < tiles[y].length; x++) {
+    // ---- Tiles dynamiques
+    for (int y = startY; y <= endY; y++) {
+      for (int x = startX; x <= endX; x++) {
         final t = tiles[y][x];
 
         if (t == TileType.empty) continue;
@@ -201,27 +168,21 @@ class GardenPainter extends CustomPainter {
         canvas.drawImageRect(image, srcRect, dstRect, Paint());
       }
     }
+
+    // ---- Sélection
     if (selectionStart != null && selectionEnd != null) {
-      // Convertir en indices de tiles
-      int startX = (selectionStart!.dx / tileSize).floor();
-      int startY = (selectionStart!.dy / tileSize).floor();
-      int endX = (selectionEnd!.dx / tileSize).floor();
-      int endY = (selectionEnd!.dy / tileSize).floor();
-
-      // 🔹 Clipper aux limites du tableau
-      startX = startX.clamp(0, tiles[0].length - 1);
-      endX = endX.clamp(0, tiles[0].length - 1);
-      startY = startY.clamp(0, tiles.length - 1);
-      endY = endY.clamp(0, tiles.length - 1);
-
-      final left = startX < endX ? startX : endX;
-      final right = startX > endX ? startX : endX;
-      final top = startY < endY ? startY : endY;
-      final bottom = startY > endY ? startY : endY;
-
       final paint = Paint()..color = Colors.blue.withOpacity(0.3);
 
-      // Boucler seulement sur les tiles valides
+      final sx = (selectionStart!.dx / tileSize).floor();
+      final sy = (selectionStart!.dy / tileSize).floor();
+      final ex = (selectionEnd!.dx / tileSize).floor();
+      final ey = (selectionEnd!.dy / tileSize).floor();
+
+      final left = sx < ex ? sx : ex;
+      final right = sx > ex ? sx : ex;
+      final top = sy < ey ? sy : ey;
+      final bottom = sy > ey ? sy : ey;
+
       for (int y = top; y <= bottom; y++) {
         for (int x = left; x <= right; x++) {
           canvas.drawRect(
