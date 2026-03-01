@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -61,12 +62,15 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
   late Offset _startTranslation;
 
   Size _viewportSize = Size.zero;
+  Size? _mapWorldSize;
 
   ViewMode _viewMode = ViewMode.panZoom;
 
   ui.Image? _backgroundCache;
   Size? _backgroundCacheSize;
   bool _isBuildingCache = false;
+
+  bool _hasInitializedView = false;
 
   @override
   void initState() {
@@ -77,6 +81,20 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
   Offset _screenToWorld(Offset screenPos) {
     final inv = Matrix4.inverted(_transform);
     return MatrixUtils.transformPoint(inv, screenPos);
+  }
+
+  Offset _screenDeltaToWorld(Offset delta) {
+    // Enlever le scale
+    final scaled = delta / _scale;
+
+    // Enlever la rotation
+    final cosR = math.cos(-_rotation);
+    final sinR = math.sin(-_rotation);
+
+    return Offset(
+      scaled.dx * cosR - scaled.dy * sinR,
+      scaled.dx * sinR + scaled.dy * cosR,
+    );
   }
 
   Future<void> _rebuildBackgroundCache(Size size, GardenPainter painter) async {
@@ -461,9 +479,50 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
     });
   }
 
+  void resetViewToFit() {
+    if (_mapWorldSize != null) {
+      final mapWidth = _mapWorldSize!.width;
+      final mapHeight = _mapWorldSize!.height;
+
+      final viewWidth = _viewportSize.width;
+      final viewHeight = _viewportSize.height;
+
+      // --- 1. Rotation : grand axe vertical
+      if (mapWidth > mapHeight) {
+        _rotation = math.pi / 2;
+      } else {
+        _rotation = 0;
+      }
+
+      // --- 2. Dimensions après rotation
+      final rotatedWidth = _rotation == 0 ? mapWidth : mapHeight;
+      final rotatedHeight = _rotation == 0 ? mapHeight : mapWidth;
+
+      // --- 3. Scale pour fitter
+      _scale = math.min(viewWidth / rotatedWidth, viewHeight / rotatedHeight);
+
+      // marge de confort
+      _scale *= 0.95;
+
+      // --- 4. Centrage
+      final centerWorld = Offset(mapWidth / 2, mapHeight / 2);
+      final centerScreen = Offset(viewWidth / 2, viewHeight / 2);
+
+      _translation = centerScreen - centerWorld * 1 / _scale;
+    }
+  }
+
   Widget tileMapEditor() {
     final gridSize = _computeGridSize();
     final tileSizePx = tileSizeMeters * pixelsPerMeter;
+
+    final mapWorldSize = Size(
+      gridSize.width * tileSizePx,
+      gridSize.height * tileSizePx,
+    );
+
+    // initialisation UNE SEULE FOIS
+    _mapWorldSize ??= mapWorldSize;
 
     final notifier = ref.read(tileEditorProvider(gridSize).notifier);
     final state = ref.watch(tileEditorProvider(gridSize));
@@ -509,6 +568,21 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
         LayoutBuilder(
           builder: (context, constraints) {
             _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+            _viewportSize = constraints.biggest;
+
+            if (!_hasInitializedView &&
+                _mapWorldSize != null &&
+                _viewportSize.isFinite) {
+              _hasInitializedView = true;
+
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                setState(() {
+                  resetViewToFit();
+                  _updateTransform();
+                });
+              });
+            }
 
             return GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -527,7 +601,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
                         if (_viewMode == ViewMode.panZoom) {
                           // --- Nouveau scale ---
                           final newScale = (_startScale * (1 / details.scale))
-                              .clamp(0.4, 8.0);
+                              .clamp(0.2, 8.0);
 
                           // --- Coordonnée monde du point focal AVANT zoom ---
                           final focalWorldBefore = _screenToWorld(
@@ -546,18 +620,27 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
                           _translation += (focalWorldBefore - focalWorldAfter);
 
                           // --- Pan uniforme, en tenant compte du zoom ---
-                          final delta =
-                              (details.focalPoint - _lastFocalPoint) * _scale;
-                          _translation += delta;
+                          final deltaScreen =
+                              (details.focalPoint - _lastFocalPoint) *
+                              _scale *
+                              _scale;
+                          final deltaWorld = _screenDeltaToWorld(deltaScreen);
+
+                          _translation += deltaWorld;
 
                           _lastFocalPoint = details.focalPoint;
                         }
 
                         if (_viewMode == ViewMode.rotate) {
                           _rotation = _startRotation + details.rotation;
-                          final delta =
-                              (details.focalPoint - _lastFocalPoint) * _scale;
-                          _translation += delta;
+                          final deltaScreen =
+                              (details.focalPoint - _lastFocalPoint) *
+                              _scale *
+                              _scale;
+                          final deltaWorld = _screenDeltaToWorld(deltaScreen);
+
+                          _translation += deltaWorld;
+
                           _lastFocalPoint = details.focalPoint;
                         }
                         _updateTransform();
@@ -654,7 +737,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
                 child: IgnorePointer(
                   child: CustomPaint(
                     painter: BlueprintScalePainter(
-                      zoom: _scale,
+                      zoom: 1 / _scale,
                       pixelsPerMeter: pixelsPerMeter,
                     ),
                   ),
