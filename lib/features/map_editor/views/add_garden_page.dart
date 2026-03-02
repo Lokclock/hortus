@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hortus_app/features/map_editor/providers/tile_editor_notifier.dart';
 import 'package:hortus_app/features/map_editor/widgets/tilemap_painter.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../gardens/providers/garden_providers.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../../core/services/firebase_providers.dart';
@@ -16,7 +17,30 @@ enum EditorScreen {
   tileEditor, // mode édition actif
 }
 
-enum ViewMode { panZoom, rotate }
+enum _OverlayGestureMode { unknown, pinch, rotate }
+
+enum _MapGestureMode { unknown, pinch, rotate }
+
+const List<String> decoImages = [
+  'assets/images/deco/01.png',
+  'assets/images/deco/02.png',
+  'assets/images/deco/03.png',
+  'assets/images/deco/04.png',
+  'assets/images/deco/05.png',
+  'assets/images/deco/06.png',
+  'assets/images/deco/07.png',
+  'assets/images/deco/08.png',
+  'assets/images/deco/09.png',
+  'assets/images/deco/10.png',
+  'assets/images/deco/11.png',
+  'assets/images/deco/12.png',
+  'assets/images/deco/13.png',
+  'assets/images/deco/14.png',
+  'assets/images/deco/15.png',
+  'assets/images/deco/16.png',
+  'assets/images/deco/17.png',
+  'assets/images/deco/18.png',
+];
 
 class AddGardenPage extends ConsumerStatefulWidget {
   const AddGardenPage({super.key});
@@ -64,13 +88,38 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
   Size _viewportSize = Size.zero;
   Size? _mapWorldSize;
 
-  ViewMode _viewMode = ViewMode.panZoom;
-
   ui.Image? _backgroundCache;
   Size? _backgroundCacheSize;
   bool _isBuildingCache = false;
 
-  bool _hasInitializedView = false;
+  Size? _lastInitViewport;
+
+  // Overlay image (calque)
+  ui.Image? _overlayImage;
+  bool _overlayVisible = false;
+  bool _overlayLocked = true;
+  Offset _overlayWorldOffset = Offset.zero;
+  double _overlayWorldScale = 1.0;
+  double _overlayOpacity = 0.4;
+  double _overlayWorldRotation = 0.0;
+
+  // --- pour gérer le gesture ---
+  late Offset _overlayLastFocalPoint;
+  late Offset _overlayStartOffset;
+  late double _overlayStartScale;
+  late double _overlayStartRotation;
+
+  _OverlayGestureMode _overlayGestureMode = _OverlayGestureMode.unknown;
+  _MapGestureMode _mapGestureMode = _MapGestureMode.unknown;
+
+  final double _zoomThreshold = 0.02;
+  final double _rotationThreshold = 0.02;
+
+  bool _overlayOpacityVisible = false;
+  bool overlaySliderExpanded = false;
+
+  bool _decoPanelVisible = false;
+  String? _selectedDecoImage;
 
   @override
   void initState() {
@@ -95,6 +144,22 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
       scaled.dx * cosR - scaled.dy * sinR,
       scaled.dx * sinR + scaled.dy * cosR,
     );
+  }
+
+  Future<void> _pickOverlayImage() async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: ImageSource.gallery);
+
+    if (file == null) return;
+
+    final bytes = await file.readAsBytes();
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+
+    setState(() {
+      _overlayImage = frame.image;
+      _overlayVisible = true;
+    });
   }
 
   Future<void> _rebuildBackgroundCache(Size size, GardenPainter painter) async {
@@ -211,9 +276,6 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
       tileType: 'hard',
     );
   }
-  // ============================================================
-  // SAVE GARDEN
-  // ============================================================
 
   Future<void> _saveGarden(TileEditorState state) async {
     if (!_formKey.currentState!.validate()) return;
@@ -244,10 +306,6 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
     if (mounted) Navigator.pop(context);
   }
 
-  // ============================================================
-  // DIMENSIONS -> GRID SIZE
-  // ============================================================
-
   Size _computeGridSize() {
     final width = double.tryParse(widthCtrl.text) ?? 1;
     final length = double.tryParse(lengthCtrl.text) ?? 1;
@@ -258,17 +316,15 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
     return Size(tilesX.toDouble(), tilesY.toDouble());
   }
 
-  // ============================================================
-  // TOOLBAR
-  // ============================================================
-
   Widget _toolButton(
     IconData icon,
     Color color,
     bool active,
     VoidCallback onTap,
+    VoidCallback? onLongPress,
   ) {
     return GestureDetector(
+      onLongPress: onLongPress,
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
@@ -303,6 +359,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
                   notifier.setBrush(TileType.soil);
                   setState(() => paintMode = true);
                 },
+                null,
               ),
               _toolButton(
                 Icons.square,
@@ -312,6 +369,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
                   notifier.setBrush(TileType.hard);
                   setState(() => paintMode = true);
                 },
+                null,
               ),
               _toolButton(
                 Icons.delete,
@@ -321,43 +379,183 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
                   notifier.setBrush(TileType.empty);
                   setState(() => paintMode = true);
                 },
+                null,
               ),
-              _toolButton(
-                Icons.zoom_in_map,
-                Colors.blue,
-                !paintMode && _viewMode == ViewMode.panZoom,
-                () {
-                  setState(() => paintMode = false);
-                  setState(() => _viewMode = ViewMode.panZoom);
-                },
-              ),
-              _toolButton(
-                Icons.rotate_90_degrees_cw_sharp,
-                Colors.blue,
-                !paintMode && _viewMode == ViewMode.rotate,
-                () {
-                  setState(() => paintMode = false);
-                  setState(() => _viewMode = ViewMode.rotate);
-                },
-              ),
+              _toolButton(Icons.zoom_in_map, Colors.blue, !paintMode, () {
+                setState(() => paintMode = false);
+              }, null),
               _toolButton(Icons.reset_tv_rounded, Colors.blue, false, () {
-                resetView();
-              }),
+                setState(() {
+                  resetViewToFit(_mapWorldSize!);
+                });
+              }, null),
             ],
           ),
           SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _toolButton(Icons.undo, Colors.white, false, notifier.undo),
-              _toolButton(Icons.redo, Colors.white, false, notifier.redo),
+              _toolButton(Icons.undo, Colors.white, false, notifier.undo, null),
+              _toolButton(Icons.redo, Colors.white, false, notifier.redo, null),
               _toolButton(Icons.grid_4x4, Colors.cyan, gridVisible, () {
                 setState(() => gridVisible = !gridVisible);
-              }),
-              _toolButton(Icons.layers, Colors.cyan, false, () {}),
+              }, null),
+              _toolButton(Icons.layers, Colors.cyan, _overlayVisible, () {
+                setState(() {
+                  _overlayVisible = !_overlayVisible;
+                  _overlayLocked = true;
+                  _overlayOpacityVisible = !_overlayOpacityVisible;
+                });
+              }, _pickOverlayImage),
+
+              _toolButton(
+                Icons.emoji_nature,
+                Colors.lightGreen,
+                _decoPanelVisible,
+                () {
+                  setState(() {
+                    _decoPanelVisible = !_decoPanelVisible;
+                  });
+                },
+                null,
+              ),
             ],
           ),
+          SizedBox(height: 5),
         ],
+      ),
+    );
+  }
+
+  Widget _decoPanel() {
+    if (!_decoPanelVisible) return const SizedBox();
+
+    return Positioned(
+      right: 12,
+      top: 140,
+
+      child: Container(
+        width: 80,
+        height: 500,
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.85),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black38,
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ListView.builder(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: decoImages.length,
+          itemBuilder: (context, index) {
+            final path = decoImages[index];
+            final isSelected = path == _selectedDecoImage;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedDecoImage = path;
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  padding: const EdgeInsets.all(6),
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? Colors.lightGreen.withOpacity(0.25)
+                        : Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected
+                          ? Colors.lightGreen
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                  child: Image.asset(path, fit: BoxFit.contain, height: 48),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _overlayOpacityPanel() {
+    if (!_overlayVisible || !_overlayOpacityVisible) {
+      return const SizedBox();
+    }
+
+    return Positioned(
+      top: 120,
+      right: 15,
+      child: Container(
+        width: 56,
+        height: overlaySliderExpanded ? 340 : null,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: const ui.Color.fromARGB(160, 0, 0, 0),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: const [
+            BoxShadow(
+              color: ui.Color.fromARGB(70, 0, 0, 0),
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            IconButton(
+              onPressed: () {
+                setState(() {
+                  overlaySliderExpanded = !overlaySliderExpanded;
+                });
+              },
+              icon: Icon(Icons.layers, color: Colors.white70, size: 25),
+            ),
+
+            overlaySliderExpanded
+                ? Expanded(
+                    child: RotatedBox(
+                      quarterTurns: -1,
+                      child: Slider(
+                        value: _overlayOpacity,
+                        min: 0.0,
+                        max: 1.0,
+                        onChanged: (v) {
+                          setState(() {
+                            _overlayOpacity = v;
+                          });
+                        },
+                      ),
+                    ),
+                  )
+                : SizedBox(),
+
+            const SizedBox(height: 6),
+
+            IconButton(
+              onPressed: () {
+                setState(() {
+                  _overlayLocked ? _unlockOverlay() : _lockOverlay();
+                });
+              },
+              icon: Icon(
+                _overlayLocked ? Icons.lock : Icons.lock_open,
+                color: Colors.orange,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -469,47 +667,135 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
       );
   }
 
-  void resetView() {
-    setState(() {
-      _scale = 1;
-      _rotation = 0;
-      _translation = Offset.zero;
-      _updateTransform();
-      _viewMode = ViewMode.panZoom;
-    });
+  void resetViewToFit(Size mapWorldSize) {
+    final mapW = mapWorldSize.width;
+    final mapH = mapWorldSize.height;
+
+    final viewW = _viewportSize.width;
+    final viewH = _viewportSize.height;
+
+    // 0️⃣ Reset propre
+    _scale = 1.0;
+    _rotation = 0.0;
+    _translation = Offset.zero;
+
+    // 1️⃣ Rotation (grand axe vertical)
+    if (mapW > mapH) {
+      _rotation = math.pi / 2;
+    }
+
+    // 2️⃣ Dimensions apparentes après rotation
+    final fittedW = _rotation == 0 ? mapW : mapH;
+    final fittedH = _rotation == 0 ? mapH : mapW;
+
+    // 3️⃣ Scale FIT (⚠️ division, pas multiplication)
+    _scale = (math.max(fittedW / viewW, fittedH / viewH)) * 1.05;
+
+    // 4️⃣ Centrage monde → viewport
+    final worldCenter = Offset(mapW / 2, mapH / 2);
+    final viewportCenter = Offset(viewW / 2, viewH / 2);
+
+    _translation = viewportCenter - worldCenter;
+
+    _updateTransform();
   }
 
-  void resetViewToFit() {
-    if (_mapWorldSize != null) {
-      final mapWidth = _mapWorldSize!.width;
-      final mapHeight = _mapWorldSize!.height;
+  bool _wouldMapRemainVisible(Offset candidateTranslation, Size mapWorldSize) {
+    final testTransform = Matrix4.identity()
+      ..translateByVector3(
+        Vector3(_viewportSize.width / 2, _viewportSize.height / 2, 0),
+      )
+      ..scaleByDouble(1, 1, 1, _scale)
+      ..rotateZ(_rotation)
+      ..translateByVector3(
+        Vector3(
+          -_viewportSize.width / 2 + candidateTranslation.dx,
+          -_viewportSize.height / 2 + candidateTranslation.dy,
+          0,
+        ),
+      );
 
-      final viewWidth = _viewportSize.width;
-      final viewHeight = _viewportSize.height;
+    final topLeft = MatrixUtils.transformPoint(testTransform, Offset(0, 0));
 
-      // --- 1. Rotation : grand axe vertical
-      if (mapWidth > mapHeight) {
-        _rotation = math.pi / 2;
-      } else {
-        _rotation = 0;
-      }
+    final bottomRight = MatrixUtils.transformPoint(
+      testTransform,
+      Offset(mapWorldSize.width, mapWorldSize.height),
+    );
 
-      // --- 2. Dimensions après rotation
-      final rotatedWidth = _rotation == 0 ? mapWidth : mapHeight;
-      final rotatedHeight = _rotation == 0 ? mapHeight : mapWidth;
+    final mapRect = Rect.fromPoints(topLeft, bottomRight);
 
-      // --- 3. Scale pour fitter
-      _scale = math.min(viewWidth / rotatedWidth, viewHeight / rotatedHeight);
+    const margin = 20.0; // 1px visible minimum
 
-      // marge de confort
-      _scale *= 0.95;
+    final viewport = Rect.fromLTWH(
+      0,
+      0,
+      _viewportSize.width,
+      _viewportSize.height,
+    );
 
-      // --- 4. Centrage
-      final centerWorld = Offset(mapWidth / 2, mapHeight / 2);
-      final centerScreen = Offset(viewWidth / 2, viewHeight / 2);
+    return mapRect.overlaps(viewport.deflate(margin));
+  }
 
-      _translation = centerScreen - centerWorld * 1 / _scale;
+  void _lockOverlay() {
+    setState(() => _overlayLocked = true);
+  }
+
+  void _unlockOverlay() {
+    setState(() => _overlayLocked = false);
+  }
+
+  Widget _overlayGestureDetector() {
+    if (!_overlayVisible || _overlayLocked || _overlayImage == null) {
+      return const SizedBox();
     }
+
+    return Positioned.fill(
+      child: GestureDetector(
+        onScaleStart: (details) {
+          _overlayLastFocalPoint = details.focalPoint;
+          _overlayStartScale = _overlayWorldScale;
+          _overlayStartRotation = _overlayWorldRotation;
+          _overlayStartOffset = _overlayWorldOffset;
+          _overlayGestureMode = _OverlayGestureMode.unknown;
+        },
+        onScaleUpdate: (details) {
+          setState(() {
+            final scaleDelta = (details.scale - 1.0).abs();
+            final rotationDelta = details.rotation.abs();
+
+            if (_overlayGestureMode == _OverlayGestureMode.unknown) {
+              // Déterminer le geste dominant
+              if (scaleDelta > _zoomThreshold) {
+                _overlayGestureMode = _OverlayGestureMode.pinch;
+              } else if (rotationDelta > _rotationThreshold &&
+                  details.pointerCount >= 2) {
+                _overlayGestureMode = _OverlayGestureMode.rotate;
+              }
+            }
+
+            // Translation toujours appliquée
+            final deltaScreen =
+                (details.focalPoint - _overlayLastFocalPoint) * _scale * _scale;
+            final deltaWorld = _screenDeltaToWorld(deltaScreen);
+            _overlayWorldOffset = _overlayStartOffset + deltaWorld;
+
+            // Appliquer scale seulement si geste dominant est pinch ou rotate
+            if (_overlayGestureMode == _OverlayGestureMode.pinch ||
+                _overlayGestureMode == _OverlayGestureMode.rotate) {
+              _overlayWorldScale = _overlayStartScale * details.scale;
+            }
+
+            // Appliquer rotation seulement si geste dominant est rotate
+            if (_overlayGestureMode == _OverlayGestureMode.rotate) {
+              _overlayWorldRotation = _overlayStartRotation + details.rotation;
+            }
+          });
+        },
+        onScaleEnd: (details) {
+          _overlayGestureMode = _OverlayGestureMode.unknown;
+        },
+      ),
+    );
   }
 
   Widget tileMapEditor() {
@@ -570,16 +856,16 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
             _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
             _viewportSize = constraints.biggest;
 
-            if (!_hasInitializedView &&
-                _mapWorldSize != null &&
-                _viewportSize.isFinite) {
-              _hasInitializedView = true;
+            if (_mapWorldSize != null &&
+                _viewportSize.isFinite &&
+                _viewportSize != Size.zero &&
+                _lastInitViewport != _viewportSize) {
+              _lastInitViewport = _viewportSize;
 
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!mounted) return;
                 setState(() {
-                  resetViewToFit();
-                  _updateTransform();
+                  resetViewToFit(_mapWorldSize!);
                 });
               });
             }
@@ -593,78 +879,123 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
                       _startScale = _scale;
                       _startRotation = _rotation;
                       _startTranslation = _translation;
+                      _mapGestureMode = _MapGestureMode.unknown;
                     },
               onScaleUpdate: paintMode
                   ? null
                   : (details) {
                       setState(() {
-                        if (_viewMode == ViewMode.panZoom) {
-                          // --- Nouveau scale ---
-                          final newScale = (_startScale * (1 / details.scale))
-                              .clamp(0.2, 8.0);
+                        final scaleDelta = (details.scale - 1.0).abs();
+                        final rotationDelta = details.rotation.abs();
 
-                          // --- Coordonnée monde du point focal AVANT zoom ---
-                          final focalWorldBefore = _screenToWorld(
-                            details.focalPoint,
-                          );
-
-                          // --- Appliquer le nouveau scale ---
-                          _scale = newScale;
-
-                          // --- Coordonnée monde du point focal APRÈS zoom ---
-                          final focalWorldAfter = _screenToWorld(
-                            details.focalPoint,
-                          );
-
-                          // --- Ajuste la translation pour que le point focal reste fixe ---
-                          _translation += (focalWorldBefore - focalWorldAfter);
-
-                          // --- Pan uniforme, en tenant compte du zoom ---
-                          final deltaScreen =
-                              (details.focalPoint - _lastFocalPoint) *
-                              _scale *
-                              _scale;
-                          final deltaWorld = _screenDeltaToWorld(deltaScreen);
-
-                          _translation += deltaWorld;
-
-                          _lastFocalPoint = details.focalPoint;
+                        // Déterminer le geste dominant si inconnu
+                        if (_mapGestureMode == _MapGestureMode.unknown) {
+                          if (scaleDelta > _zoomThreshold) {
+                            _mapGestureMode = _MapGestureMode.pinch;
+                          } else if (rotationDelta > _rotationThreshold &&
+                              details.pointerCount >= 2) {
+                            _mapGestureMode = _MapGestureMode.rotate;
+                          }
                         }
 
-                        if (_viewMode == ViewMode.rotate) {
+                        // --- Coordonnée monde du point focal AVANT zoom ---
+                        final focalWorldBefore = _screenToWorld(
+                          details.focalPoint,
+                        );
+
+                        // --- Appliquer scale si mode pinch ou rotate ---
+                        if (_mapGestureMode == _MapGestureMode.pinch ||
+                            _mapGestureMode == _MapGestureMode.rotate) {
+                          _scale = (_startScale / details.scale).clamp(
+                            0.2,
+                            8.0,
+                          );
+                        }
+
+                        // --- Coordonnée monde du point focal APRÈS zoom ---
+                        final focalWorldAfter = _screenToWorld(
+                          details.focalPoint,
+                        );
+
+                        // --- Ajuste la translation pour que le point focal reste fixe ---
+                        _translation += (focalWorldBefore - focalWorldAfter);
+
+                        // --- Pan uniforme, en tenant compte du zoom ---
+                        final deltaScreen =
+                            (details.focalPoint - _lastFocalPoint) *
+                            _scale *
+                            _scale;
+                        final deltaWorld = _screenDeltaToWorld(deltaScreen);
+
+                        final candidateTranslation = _translation + deltaWorld;
+
+                        if (_wouldMapRemainVisible(
+                          candidateTranslation,
+                          _mapWorldSize!,
+                        )) {
+                          _translation = candidateTranslation;
+                        }
+
+                        _lastFocalPoint = details.focalPoint;
+
+                        // --- Appliquer rotation seulement si mode rotate ---
+                        if (_mapGestureMode == _MapGestureMode.rotate) {
                           _rotation = _startRotation + details.rotation;
-                          final deltaScreen =
-                              (details.focalPoint - _lastFocalPoint) *
-                              _scale *
-                              _scale;
-                          final deltaWorld = _screenDeltaToWorld(deltaScreen);
-
-                          _translation += deltaWorld;
-
-                          _lastFocalPoint = details.focalPoint;
                         }
+
                         _updateTransform();
                       });
                     },
+              onScaleEnd: paintMode
+                  ? null
+                  : (details) {
+                      // Reset du mode dominant
+                      _mapGestureMode = _MapGestureMode.unknown;
+                    },
+
               child: SizedBox.expand(
                 child: Stack(
                   children: [
                     Transform(
                       transform: _transform,
-                      child: CustomPaint(
-                        size: Size(
-                          gridSize.width * tileSizePx,
-                          gridSize.height * tileSizePx,
-                        ),
-                        painter: painter,
+                      child: Stack(
+                        children: [
+                          CustomPaint(
+                            size: Size(
+                              gridSize.width * tileSizePx,
+                              gridSize.height * tileSizePx,
+                            ),
+                            painter: painter,
+                          ),
+                          if (_overlayVisible && _overlayImage != null)
+                            Transform(
+                              alignment: Alignment.center,
+                              transform: Matrix4.identity()
+                                ..translate(
+                                  _overlayWorldOffset.dx,
+                                  _overlayWorldOffset.dy,
+                                )
+                                ..scale(_overlayWorldScale)
+                                ..rotateZ(_overlayWorldRotation),
+                              child: Opacity(
+                                opacity: _overlayOpacity,
+                                child: RawImage(image: _overlayImage),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
+
+                    // Gesture overlay
+                    _overlayGestureDetector(),
+
                     if (paintMode)
                       Positioned.fill(
                         child: GestureDetector(
                           behavior: HitTestBehavior.translucent,
 
                           onTapDown: (d) {
+                            notifier.beginPaint();
                             final worldPos = _screenToWorld(
                               (context.findRenderObject() as RenderBox)
                                   .globalToLocal(d.globalPosition),
@@ -694,7 +1025,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
                               setState(() {});
                               return;
                             }
-
+                            notifier.beginPaint();
                             final worldPos = _screenToWorld(
                               (context.findRenderObject() as RenderBox)
                                   .globalToLocal(d.globalPosition),
@@ -744,6 +1075,8 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
                 ),
               )
             : SizedBox(),
+        // panneau déco
+        _decoPanel(),
 
         Positioned(
           left: 20,
@@ -791,6 +1124,70 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
     }
   }
 
+  Widget _floatingEditorBar() {
+    final gridSize = _computeGridSize();
+    final state = ref.watch(tileEditorProvider(gridSize));
+
+    return Positioned(
+      top: 40,
+      left: 40,
+      right: 40,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.8),
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: const [
+            BoxShadow(
+              color: ui.Color.fromARGB(60, 0, 0, 0),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // ⬅️ Retour
+            IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () {
+                setState(() {
+                  screen = EditorScreen.choice;
+                });
+              },
+            ),
+
+            const SizedBox(width: 8),
+
+            // 📝 Nom du jardin
+            Expanded(
+              child: Center(
+                child: Text(
+                  nameCtrl.text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 20,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            // 💾 Save
+            IconButton(
+              icon: const Icon(Icons.save, color: Colors.white),
+              onPressed: () => _saveGarden(state),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ============================================================
   // UI
   // ============================================================
@@ -798,8 +1195,15 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: _buildAppBar(),
-      body: Form(key: _formKey, child: _buildBody()),
+      appBar: screen == EditorScreen.choice ? _buildAppBar() : null,
+      body: Stack(
+        children: [
+          Form(key: _formKey, child: _buildBody()),
+
+          if (screen == EditorScreen.tileEditor) _floatingEditorBar(),
+          _overlayOpacityPanel(),
+        ],
+      ),
       backgroundColor: EditorScreen.tileEditor == screen
           ? const ui.Color.fromARGB(235, 150, 208, 255)
           : Colors.white.withOpacity(0.9),

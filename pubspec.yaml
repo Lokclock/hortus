@@ -82,6 +82,7 @@ flutter:
     - assets/images/strates/
     - assets/images/flags/
     - assets/images/symboles/
+    - assets/images/deco/
     - assets/tiles/
         
   # The following line ensures that the Material Icons font is

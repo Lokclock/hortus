@@ -35,6 +35,9 @@ class TileEditorState {
 class TileEditorNotifier extends StateNotifier<TileEditorState> {
   final List<TileHistory> _undoStack = [];
   final List<TileHistory> _redoStack = [];
+  bool _isPainting = false;
+  late List<List<TileType>> _paintStartSnapshot;
+
   TileEditorNotifier(int width, int height)
     : super(
         TileEditorState(
@@ -44,6 +47,23 @@ class TileEditorNotifier extends StateNotifier<TileEditorState> {
           ),
         ),
       );
+
+  void beginPaint() {
+    if (_isPainting) return;
+
+    _isPainting = true;
+    _paintStartSnapshot = _clone(state.tiles);
+  }
+
+  void endPaint() {
+    if (_isPainting) {
+      _undoStack.add(TileHistory(_paintStartSnapshot));
+      _redoStack.clear();
+    }
+
+    _isPainting = false;
+    state = state.copyWith(lastPaintPos: null);
+  }
 
   void setBrush(TileType brush) {
     state = state.copyWith(currentBrush: brush);
@@ -100,10 +120,6 @@ class TileEditorNotifier extends StateNotifier<TileEditorState> {
     state = state.copyWith(lastPaintPos: Offset(x.toDouble(), y.toDouble()));
   }
 
-  void endPaint() {
-    state = state.copyWith(lastPaintPos: null);
-  }
-
   void paintTile(int x, int y) {
     // Sécurité
     if (y < 0 ||
@@ -128,7 +144,6 @@ class TileEditorNotifier extends StateNotifier<TileEditorState> {
   }
 
   void updateTiles(List<List<TileType>> newTiles) {
-    _pushUndo();
     state = state.copyWith(tiles: newTiles);
   }
 
