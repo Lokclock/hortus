@@ -89,6 +89,11 @@ class GardenRepository {
   }) async {
     final uid = _auth.currentUser!.uid;
 
+    // 🔹 Convertir les tiles en int ou String pour Firestore
+    final flatTiles = tiles
+        .expand((row) => row.map((t) => t.index)) // TileType → int
+        .toList();
+
     final docRef = await _gardens.add({
       'name': name,
       'width': width,
@@ -98,6 +103,10 @@ class GardenRepository {
       'ownerId': uid,
       'ownerUsername': ownerUsername,
       'createdAt': FieldValue.serverTimestamp(),
+      'tilemap': flatTiles, // List<int> aplati
+      'tilesWide': tiles.first.length,
+      'tilesHigh': tiles.length,
+      'tileSize': 64.0,
     });
 
     return docRef; // <-- retourne le DocumentReference

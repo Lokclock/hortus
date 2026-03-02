@@ -5,6 +5,7 @@ import 'package:hortus_app/features/gardens/providers/garden_providers.dart';
 import 'package:hortus_app/features/map/providers/add_plant_provider.dart';
 import 'package:hortus_app/features/map/providers/garden_permissions_provider.dart';
 import 'package:hortus_app/features/map/providers/map_mode_provider.dart';
+import 'package:hortus_app/features/map/providers/tilemap_provider.dart';
 import 'package:hortus_app/features/map/views/add_plant_page.dart';
 import 'package:hortus_app/features/map/views/garden_canvas.dart';
 import 'package:hortus_app/features/map/views/positioning_overlay.dart';
@@ -21,19 +22,26 @@ class GardenMapPage extends ConsumerWidget {
     final mode = ref.watch(mapModeProvider);
     final plantsAsync = ref.watch(plantsStreamProvider(gardenId));
     final canEdit = ref.watch(canEditGardenProvider(gardenId));
-
+    final tilemapAsync = ref.watch(tilemapProvider(gardenId));
     return Scaffold(
       body: Stack(
         children: [
-          /// 🌿 MAP
+          // 🌿 MAP : on attend à la fois les plantes ET la tilemap
           plantsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text("Erreur: $e")),
             data: (plants) {
-              return GardenCanvas(
-                gardenId: gardenId,
-                plants: plants,
-                canEdit: canEdit,
+              return tilemapAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text("Erreur tilemap: $e")),
+                data: (tilemapImage) {
+                  return GardenCanvas(
+                    gardenId: gardenId,
+                    plants: plants,
+                    canEdit: canEdit,
+                    tilemapImage: tilemapImage, // <- ton image générée ici
+                  );
+                },
               );
             },
           ),

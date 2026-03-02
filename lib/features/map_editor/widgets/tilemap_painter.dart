@@ -122,7 +122,6 @@ class GardenPainter extends CustomPainter {
     }
 
     // ---- Culling
-    // ---- Culling corrigé pour rotation
     final corners = [
       Offset(0, 0),
       Offset(viewportSize.width, 0),

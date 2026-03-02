@@ -12,7 +12,10 @@ class Garden {
   final List<String>? imageUrl;
   final String? ownerUsername;
   final String? backgroundType;
-  final Map<String, dynamic>? tilemap;
+  final List<dynamic>? tilemap;
+  final int? tilesWide;
+  final int? tilesHigh;
+  final double? tileSize;
 
   Garden({
     required this.id,
@@ -27,6 +30,9 @@ class Garden {
     this.imageUrl,
     this.backgroundType,
     this.tilemap,
+    this.tilesHigh,
+    this.tilesWide,
+    this.tileSize,
   });
 
   bool canEdit(String uid) {
@@ -49,6 +55,9 @@ class Garden {
       ownerUsername: data['ownerUsername'] ?? '',
       backgroundType: data['backgroundType'],
       tilemap: data['tilemap'],
+      tilesWide: data['tilesWide'],
+      tilesHigh: data['tilesHigh'],
+      tileSize: data['tileSize'],
     );
   }
 
@@ -65,6 +74,9 @@ class Garden {
       'ownerUsername': ownerUsername,
       'backgroundType': backgroundType,
       'tilemap': tilemap,
+      'tilesWide': tilesWide,
+      'tilesHigh': tilesHigh,
+      'tileSize': tileSize,
     };
   }
 }
