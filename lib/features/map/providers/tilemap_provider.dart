@@ -64,7 +64,7 @@ final tilemapProvider = FutureProvider.family<ui.Image?, String>((
   final flatTiles = (data['tilemap'] as List<dynamic>).cast<int>();
   final tilesWide = data['tilesWide'] as int;
   final tilesHigh = data['tilesHigh'] as int;
-  final tileSize = data['tilesSize'] as double;
+  final tileSize = data['tileSize'] as double;
 
   final tiles = List.generate(
     tilesHigh,

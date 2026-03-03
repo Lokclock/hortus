@@ -121,6 +121,9 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
   bool _decoPanelVisible = false;
   String? _selectedDecoImage;
 
+  late final Size _editorGridSize;
+  late TileEditorNotifier _editorNotifier;
+
   @override
   void initState() {
     super.initState();
@@ -277,7 +280,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
     );
   }
 
-  Future<void> _saveGarden(TileEditorState state) async {
+  Future<void> _saveGarden() async {
     if (!_formKey.currentState!.validate()) return;
 
     final uid = ref.read(currentUserProvider);
@@ -291,6 +294,9 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
 
     final username = userDoc.data()?['username'] ?? "inconnu";
 
+    final tilesToSave = _editorNotifier.state.tiles;
+
+    // 🔹 Sauvegarde
     await ref
         .read(gardenRepoProvider)
         .createGarden(
@@ -300,8 +306,14 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
           ownerUsername: username,
           isPublic: false,
           isEditable: false,
-          tiles: state.tiles,
+          tiles: tilesToSave, // tiles correctes
         );
+
+    // 🔹 Réinitialiser la tilemap
+    _editorNotifier.reset(
+      _editorGridSize.width.toInt(),
+      _editorGridSize.height.toInt(),
+    );
 
     if (mounted) Navigator.pop(context);
   }
@@ -414,6 +426,15 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
                 _decoPanelVisible,
                 () {
                   setState(() {
+                    // ✅ Récupérer le gridSize utilisé pour l'édition
+                    final gridSize = _computeGridSize();
+
+                    // ✅ Lire l'état actuel du tile editor
+                    final notifier = ref.read(
+                      tileEditorProvider(gridSize).notifier,
+                    );
+
+                    print('state.tiles= ${notifier.state.tiles}');
                     _decoPanelVisible = !_decoPanelVisible;
                   });
                 },
@@ -611,6 +632,10 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
               onPressed: () {
                 setState(() {
                   screen = EditorScreen.tileEditor;
+                  _editorGridSize = _computeGridSize();
+                  _editorNotifier = ref.read(
+                    tileEditorProvider(_editorGridSize).notifier,
+                  );
                 });
               },
               child: const Text("Créer une carte"),
@@ -799,7 +824,9 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
   }
 
   Widget tileMapEditor() {
-    final gridSize = _computeGridSize();
+    final gridSize = _editorGridSize; // utilise la taille fixée
+    final notifier = _editorNotifier;
+    final state = ref.watch(tileEditorProvider(_editorGridSize));
     final tileSizePx = tileSizeMeters * pixelsPerMeter;
 
     final mapWorldSize = Size(
@@ -809,9 +836,6 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
 
     // initialisation UNE SEULE FOIS
     _mapWorldSize ??= mapWorldSize;
-
-    final notifier = ref.read(tileEditorProvider(gridSize).notifier);
-    final state = ref.watch(tileEditorProvider(gridSize));
 
     final visibleRect = _computeVisibleWorldRect();
 
@@ -1004,6 +1028,8 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
                             final x = (worldPos.dx / tileSizePx).floor();
                             final y = (worldPos.dy / tileSizePx).floor();
                             notifier.paintTile(x, y);
+
+                            print('_editorGridSize = $_editorGridSize');
                           },
 
                           onDoubleTapDown: (d) {
@@ -1106,7 +1132,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
           actions: [
             IconButton(
               icon: const Icon(Icons.save),
-              onPressed: () => _saveGarden(state),
+              onPressed: () => _saveGarden(),
             ),
           ],
           leading: IconButton(
@@ -1180,7 +1206,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
             // 💾 Save
             IconButton(
               icon: const Icon(Icons.save, color: Colors.white),
-              onPressed: () => _saveGarden(state),
+              onPressed: () => _saveGarden(),
             ),
           ],
         ),
