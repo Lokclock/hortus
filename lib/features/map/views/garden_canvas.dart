@@ -66,7 +66,7 @@ class _GardenCanvasState extends ConsumerState<GardenCanvas> {
     });
   }
 
-  Offset _clampTranslationSoft(Offset candidate, Size mapWorldSize) {
+  Offset _clampTranslation(Offset candidate, Size mapWorldSize) {
     const double allowedOverflow = 80.0; // 🔥 marge autorisée
 
     final testTransform = Matrix4.identity()
@@ -124,7 +124,17 @@ class _GardenCanvasState extends ConsumerState<GardenCanvas> {
     final worldDelta =
         MatrixUtils.transformPoint(inv, correctedScreen) -
         MatrixUtils.transformPoint(inv, Offset.zero);
-
+    debugPrint("""
+--- CLAMP ---
+minX: $minX
+maxX: $maxX
+minY: $minY
+maxY: $maxY
+viewport: $_viewportSize
+candidate: $candidate
+correctionX: $correctionX
+correctionY: $correctionY
+""");
     return candidate + worldDelta;
   }
 
@@ -185,7 +195,7 @@ class _GardenCanvasState extends ConsumerState<GardenCanvas> {
     translation += deltaWorld;
 
     // 6️⃣ Clamp final
-    translation = _clampTranslationSoft(translation, mapWorldSize!);
+    translation = _clampTranslation(translation, mapWorldSize!);
 
     lastFocalPoint = details.focalPoint;
 
@@ -347,6 +357,13 @@ class _GardenCanvasState extends ConsumerState<GardenCanvas> {
                         ),
                       );
                     }).toList(),
+                    CustomPaint(
+                      size: _viewportSize,
+                      painter: DebugBoundsPainter(
+                        transform: _transform,
+                        mapWorldSize: mapWorldSize!,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -356,4 +373,53 @@ class _GardenCanvasState extends ConsumerState<GardenCanvas> {
       },
     );
   }
+}
+
+class DebugBoundsPainter extends CustomPainter {
+  final Matrix4 transform;
+  final Size mapWorldSize;
+
+  DebugBoundsPainter({required this.transform, required this.mapWorldSize});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paintMap = Paint()
+      ..color = Colors.red
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    final p1 = MatrixUtils.transformPoint(transform, Offset(0, 0));
+    final p2 = MatrixUtils.transformPoint(
+      transform,
+      Offset(mapWorldSize.width, 0),
+    );
+    final p3 = MatrixUtils.transformPoint(
+      transform,
+      Offset(mapWorldSize.width, mapWorldSize.height),
+    );
+    final p4 = MatrixUtils.transformPoint(
+      transform,
+      Offset(0, mapWorldSize.height),
+    );
+
+    final path = Path()
+      ..moveTo(p1.dx, p1.dy)
+      ..lineTo(p2.dx, p2.dy)
+      ..lineTo(p3.dx, p3.dy)
+      ..lineTo(p4.dx, p4.dy)
+      ..close();
+
+    canvas.drawPath(path, paintMap);
+
+    // viewport
+    final paintViewport = Paint()
+      ..color = Colors.blue
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    canvas.drawRect(Offset.zero & size, paintViewport);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
