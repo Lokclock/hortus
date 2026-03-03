@@ -1,15 +1,15 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hortus_app/features/gardens/providers/garden_providers.dart';
 import 'package:hortus_app/features/map/providers/animated_plant_provider.dart';
 import 'package:hortus_app/features/map/providers/map_transform_provider.dart';
 import 'package:hortus_app/features/map/views/plant_details_sheet.dart';
 import 'package:hortus_app/features/plants/models/plant_model.dart';
 import 'package:vector_math/vector_math_64.dart' hide Colors;
 
-enum _MapGestureMode { unknown, pinch, rotate }
+enum MapGestureMode { unknown, pinch, rotate }
 
 class GardenCanvas extends ConsumerStatefulWidget {
   final String gardenId;
@@ -30,227 +30,330 @@ class GardenCanvas extends ConsumerStatefulWidget {
 }
 
 class _GardenCanvasState extends ConsumerState<GardenCanvas> {
-  Offset offset = Offset.zero;
-  double scale = 1.0;
-  double rotation = 0.0;
-  Offset startOffset = Offset.zero;
+  Offset startTranslation = Offset.zero;
   double startScale = 1.0;
   double startRotation = 0.0;
+  Offset startFocal = Offset.zero;
   Offset lastFocalPoint = Offset.zero;
-  final double _zoomThreshold = 0.02;
-  final double _rotationThreshold = 0.02;
-  _MapGestureMode _mapGestureMode = _MapGestureMode.unknown;
+
+  MapGestureMode gestureMode = MapGestureMode.unknown;
+
+  double zoomThreshold = 0.02;
+  double rotationThreshold = 0.1;
+
+  double scale = 1.0;
+  double rotation = 0.0;
   Offset translation = Offset.zero;
-  Size _viewportSize = Size.zero;
+
   Matrix4 _transform = Matrix4.identity();
 
-  Offset _screenDeltaToWorld(Offset delta) {
-    // Enlever le scale
-    final scaled = delta / scale;
+  Size _viewportSize = Size.zero;
 
-    // Enlever la rotation
+  Size? mapWorldSize;
+
+  _updateTransform() {
+    final center = Vector3(
+      _viewportSize.width / 2,
+      _viewportSize.height / 2,
+      0,
+    );
+    setState(() {
+      _transform = Matrix4.identity()
+        ..translate(center.x, center.y)
+        ..rotateZ(rotation)
+        ..scale(scale)
+        ..translate(-center.x + translation.dx, -center.y + translation.dy);
+    });
+  }
+
+  Offset _clampTranslationSoft(Offset candidate, Size mapWorldSize) {
+    const double allowedOverflow = 80.0; // 🔥 marge autorisée
+
+    final testTransform = Matrix4.identity()
+      ..translate(_viewportSize.width / 2, _viewportSize.height / 2)
+      ..scale(scale)
+      ..rotateZ(rotation)
+      ..translate(
+        -_viewportSize.width / 2 + candidate.dx,
+        -_viewportSize.height / 2 + candidate.dy,
+      );
+
+    // 🔹 Transforme les 4 coins
+    final p1 = MatrixUtils.transformPoint(testTransform, const Offset(0, 0));
+    final p2 = MatrixUtils.transformPoint(
+      testTransform,
+      Offset(mapWorldSize.width, 0),
+    );
+    final p3 = MatrixUtils.transformPoint(
+      testTransform,
+      Offset(mapWorldSize.width, mapWorldSize.height),
+    );
+    final p4 = MatrixUtils.transformPoint(
+      testTransform,
+      Offset(0, mapWorldSize.height),
+    );
+
+    final minX = [p1.dx, p2.dx, p3.dx, p4.dx].reduce(math.min);
+    final maxX = [p1.dx, p2.dx, p3.dx, p4.dx].reduce(math.max);
+    final minY = [p1.dy, p2.dy, p3.dy, p4.dy].reduce(math.min);
+    final maxY = [p1.dy, p2.dy, p3.dy, p4.dy].reduce(math.max);
+
+    double correctionX = 0;
+    double correctionY = 0;
+
+    // ---- X axis ----
+    if (maxX < allowedOverflow) {
+      correctionX = allowedOverflow - maxX;
+    } else if (minX > _viewportSize.width - allowedOverflow) {
+      correctionX = (_viewportSize.width - allowedOverflow) - minX;
+    }
+
+    // ---- Y axis ----
+    if (maxY < allowedOverflow) {
+      correctionY = allowedOverflow - maxY;
+    } else if (minY > _viewportSize.height - allowedOverflow) {
+      correctionY = (_viewportSize.height - allowedOverflow) - minY;
+    }
+
+    final inv = Matrix4.inverted(testTransform);
+
+    // Point écran fictif corrigé
+    final correctedScreen = Offset(correctionX, correctionY);
+
+    // Convertir delta écran → delta monde
+    final worldDelta =
+        MatrixUtils.transformPoint(inv, correctedScreen) -
+        MatrixUtils.transformPoint(inv, Offset.zero);
+
+    return candidate + worldDelta;
+  }
+
+  Offset _screenToWorld(Offset screenPos) {
+    final inv = Matrix4.inverted(_transform);
+    return MatrixUtils.transformPoint(inv, screenPos);
+  }
+
+  Offset _screenDeltaToWorld(Offset delta) {
+    // Convertir déplacement écran en déplacement monde
+    final scaled = delta / scale;
     final cosR = math.cos(-rotation);
     final sinR = math.sin(-rotation);
-
     return Offset(
       scaled.dx * cosR - scaled.dy * sinR,
       scaled.dx * sinR + scaled.dy * cosR,
     );
   }
 
-  void resetViewToFit(Size mapWorldSize) {
-    final mapW = mapWorldSize.width;
-    final mapH = mapWorldSize.height;
+  _onScaleUpdate(ScaleUpdateDetails details) {
+    if (mapWorldSize == null) return;
 
-    final viewW = _viewportSize.width;
-    final viewH = _viewportSize.height;
+    // 1️⃣ Détecter le geste dominant
+    final scaleDelta = (details.scale - 1.0).abs();
+    final rotationDelta = details.rotation.abs();
 
-    // 0️⃣ Reset propre
-    scale = 1.0;
-    rotation = 0.0;
-    translation = Offset.zero;
-
-    // 1️⃣ Rotation (grand axe vertical)
-    if (mapW > mapH) {
-      rotation = math.pi / 2;
+    if (gestureMode == MapGestureMode.unknown) {
+      if (scaleDelta > zoomThreshold && details.pointerCount >= 2) {
+        gestureMode = MapGestureMode.pinch;
+      } else if (rotationDelta > rotationThreshold &&
+          details.pointerCount >= 2) {
+        gestureMode = MapGestureMode.rotate;
+      }
     }
 
-    // 2️⃣ Dimensions apparentes après rotation
-    final fittedW = rotation == 0 ? mapW : mapH;
-    final fittedH = rotation == 0 ? mapH : mapW;
+    // 2️⃣ Coordonnée monde du point focal avant changement
+    final focalWorldBefore = _screenToWorld(details.focalPoint);
 
-    // 3️⃣ Scale FIT (⚠️ division, pas multiplication)
-    scale = (math.max(fittedW / viewW, fittedH / viewH)) * 1.05;
+    // 3️⃣ Appliquer scale/rotation
 
-    // 4️⃣ Centrage monde → viewport
-    final worldCenter = Offset(mapW / 2, mapH / 2);
-    final viewportCenter = Offset(viewW / 2, viewH / 2);
+    if (gestureMode == MapGestureMode.pinch ||
+        gestureMode == MapGestureMode.rotate) {
+      scale = (startScale * details.scale).clamp(0.2, 8.0);
+    }
+    if (gestureMode == MapGestureMode.rotate) {
+      rotation = startRotation + details.rotation;
+    }
 
-    translation = viewportCenter - worldCenter;
+    // 4️⃣ Coordonnée monde du point focal après changement
+    final focalWorldAfter = _screenToWorld(details.focalPoint);
 
+    // Ajuster translation pour que le point focal reste sous les doigts
+    translation += (focalWorldBefore - focalWorldAfter);
+
+    // 5️⃣ Pan libre
+    final deltaScreen = details.focalPoint - lastFocalPoint;
+    final deltaWorld = _screenDeltaToWorld(deltaScreen);
+    translation += deltaWorld;
+
+    // 6️⃣ Clamp final
+    translation = _clampTranslationSoft(translation, mapWorldSize!);
+
+    lastFocalPoint = details.focalPoint;
+
+    // Mettre à jour le transform et notifier le provider
     _updateTransform();
+    ref
+        .read(mapTransformProviderNotifier.notifier)
+        .update(translation: translation, scale: scale, rotation: rotation);
   }
 
-  void _updateTransform() {
-    // On veut que le zoom se fasse autour du centre du viewport
-    final center = Vector3(
-      _viewportSize.width / 2,
-      _viewportSize.height / 2,
-      0,
-    );
+  _onScaleStart(ScaleStartDetails details) {
+    startTranslation = translation;
+    startScale = scale;
+    startRotation = rotation;
+    lastFocalPoint = details.focalPoint;
+    gestureMode = MapGestureMode.unknown;
+  }
 
-    _transform = Matrix4.identity()
-      ..translateByVector3(center) // on déplace le centre au milieu
-      ..scaleByDouble(1.0, 1.0, 1.0, scale) // on applique le zoom
-      ..rotateZ(rotation) // rotation si besoin
-      ..translateByVector3(
-        Vector3(-center.x + translation.dx, -center.y + translation.dy, 0),
-      );
+  _onScaleEnd(ScaleEndDetails details) {
+    gestureMode = MapGestureMode.unknown;
+  }
+
+  resetMapTransform() {
+    setState(() {
+      scale = 1.0;
+      rotation = 0.0;
+      translation = Offset.zero;
+      _updateTransform();
+      ref.read(mapTransformProviderNotifier.notifier).reset();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.blue.shade200,
-      child: GestureDetector(
-        onScaleStart: (details) {
-          lastFocalPoint = details.focalPoint;
-          startOffset = offset;
-          startScale = scale;
-          startRotation = rotation;
-          _mapGestureMode = _MapGestureMode.unknown;
-        },
-        onScaleUpdate: (details) {
-          setState(() {
-            final scaleDelta = (details.scale - 1.0).abs();
-            final rotationDelta = details.rotation.abs();
+    final gardenAsync = ref.watch(gardenProvider(widget.gardenId));
 
-            // Déterminer le geste dominant
-            if (scaleDelta > _zoomThreshold) {
-              _mapGestureMode = _MapGestureMode.pinch;
-            } else if (rotationDelta > _rotationThreshold &&
-                details.pointerCount >= 2) {
-              _mapGestureMode = _MapGestureMode.rotate;
-            }
+    return gardenAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text("Erreur: $e")),
+      data: (garden) {
+        // ✅ calculer mapWorldSize
+        mapWorldSize = Size(
+          (garden.tilesWide ?? 0) * (garden.tileSize ?? 1),
+          (garden.tilesHigh ?? 0) * (garden.tileSize ?? 1),
+        );
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+            return GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onScaleStart: (details) {
+                _onScaleStart(details);
+              },
+              onScaleUpdate: (details) {
+                _onScaleUpdate(details);
+              },
+              onScaleEnd: (details) {
+                _onScaleEnd(details);
+              },
+              child: Transform(
+                transform: _transform,
+                child: Stack(
+                  children: [
+                    // 🌱 Fond tilemap
+                    if (widget.tilemapImage != null)
+                      SizedBox(
+                        width: mapWorldSize?.width ?? _viewportSize.width,
+                        height: mapWorldSize?.height ?? _viewportSize.height,
+                        child: RawImage(image: widget.tilemapImage),
+                      ),
 
-            // Translation toujours appliquée
-            final deltaScreen =
-                (details.focalPoint - lastFocalPoint) * scale * scale;
-            final deltaWorld = _screenDeltaToWorld(deltaScreen);
-            offset = startOffset + deltaWorld;
-            // Appliquer scale seulement si geste dominant est pinch ou rotate
-            if (_mapGestureMode == _MapGestureMode.pinch ||
-                _mapGestureMode == _MapGestureMode.rotate) {
-              scale = startScale * details.scale;
-            }
+                    // 🌱 Plants
+                    ...widget.plants.map((p) {
+                      final diameter = p.diameter;
+                      final animatedId = ref.watch(animatedPlantProvider);
+                      final isAnimated = animatedId == p.id;
 
-            // Appliquer rotation seulement si geste dominant est rotate
-            if (_mapGestureMode == _MapGestureMode.rotate) {
-              rotation = startRotation + details.rotation;
-            }
-          });
-        },
-        onScaleEnd: (details) {
-          _mapGestureMode = _MapGestureMode.unknown;
-        },
-        child: Center(
-          child: Transform(
-            alignment: Alignment.center,
-            transform: _transform,
-            child: Stack(
-              children: [
-                // 🌱 Fond tilemap
-                if (widget.tilemapImage != null)
-                  RawImage(image: widget.tilemapImage),
-
-                // 🌱 Plants
-                ...widget.plants.map((p) {
-                  final diameter = p.diameter;
-                  final animatedId = ref.watch(animatedPlantProvider);
-                  final isAnimated = animatedId == p.id;
-
-                  return Positioned(
-                    left: p.x - diameter / 2,
-                    top: p.y - diameter / 2,
-                    child: SizedBox(
-                      width: diameter,
-                      height: diameter,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          /// 🌿 IMAGE AVEC ANIMATION SCALE
-                          TweenAnimationBuilder<double>(
-                            tween: Tween(begin: 1, end: isAnimated ? 1.25 : 1),
-                            duration: const Duration(milliseconds: 350),
-                            curve: Curves.elasticOut,
-                            builder: (context, scale, child) {
-                              return Transform.scale(
-                                scale: scale,
-                                child: child,
-                              );
-                            },
-                            child: (p.symbol.isNotEmpty)
-                                ? Image.asset(
-                                    p.symbol,
-                                    width: diameter,
-                                    height: diameter,
-                                    fit: BoxFit.cover,
-                                  )
-                                : Icon(
-                                    Icons.local_florist,
-                                    color: Colors.green,
-                                    size: diameter,
-                                  ),
-                          ),
-
-                          /// 🔴 ZONE TAPPABLE
-                          GestureDetector(
-                            onTap: () {
-                              if (!widget.canEdit) return;
-
-                              /// 1️⃣ déclenche animation
-                              ref.read(animatedPlantProvider.notifier).state =
-                                  p.id;
-
-                              /// 2️⃣ ouvre la fiche APRÈS un petit délai
-                              Future.delayed(
-                                const Duration(milliseconds: 220),
-                                () {
-                                  showModalBottomSheet(
-                                    context: context,
-                                    isScrollControlled: true,
-                                    backgroundColor: Colors.transparent,
-                                    builder: (_) => PlantDetailsSheet(
-                                      plantId: p.id,
-                                      gardenId: widget.gardenId,
-                                      canEdit: widget.canEdit,
-                                    ),
+                      return Positioned(
+                        left: p.x - diameter / 2,
+                        top: p.y - diameter / 2,
+                        child: SizedBox(
+                          width: diameter,
+                          height: diameter,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              /// 🌿 IMAGE AVEC ANIMATION SCALE
+                              TweenAnimationBuilder<double>(
+                                tween: Tween(
+                                  begin: 1,
+                                  end: isAnimated ? 1.25 : 1,
+                                ),
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.elasticOut,
+                                builder: (context, scale, child) {
+                                  return Transform.scale(
+                                    scale: scale,
+                                    child: child,
                                   );
                                 },
-                              );
+                                child: (p.symbol.isNotEmpty)
+                                    ? Image.asset(
+                                        p.symbol,
+                                        width: diameter,
+                                        height: diameter,
+                                        fit: BoxFit.cover,
+                                      )
+                                    : Icon(
+                                        Icons.local_florist,
+                                        color: Colors.green,
+                                        size: diameter,
+                                      ),
+                              ),
 
-                              /// 3️⃣ reset animation
-                              Future.delayed(
-                                const Duration(milliseconds: 400),
-                                () {
+                              /// 🔴 ZONE TAPPABLE
+                              GestureDetector(
+                                onTap: () {
+                                  if (!widget.canEdit) return;
+
+                                  /// 1️⃣ déclenche animation
                                   ref
                                           .read(animatedPlantProvider.notifier)
                                           .state =
-                                      null;
+                                      p.id;
+
+                                  /// 2️⃣ ouvre la fiche APRÈS un petit délai
+                                  Future.delayed(
+                                    const Duration(milliseconds: 220),
+                                    () {
+                                      showModalBottomSheet(
+                                        context: context,
+                                        isScrollControlled: true,
+                                        backgroundColor: Colors.transparent,
+                                        builder: (_) => PlantDetailsSheet(
+                                          plantId: p.id,
+                                          gardenId: widget.gardenId,
+                                          canEdit: widget.canEdit,
+                                        ),
+                                      );
+                                    },
+                                  );
+
+                                  /// 3️⃣ reset animation
+                                  Future.delayed(
+                                    const Duration(milliseconds: 400),
+                                    () {
+                                      ref
+                                              .read(
+                                                animatedPlantProvider.notifier,
+                                              )
+                                              .state =
+                                          null;
+                                    },
+                                  );
                                 },
-                              );
-                            },
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ],
-            ),
-          ),
-        ),
-      ),
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

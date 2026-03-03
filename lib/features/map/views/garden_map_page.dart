@@ -5,6 +5,7 @@ import 'package:hortus_app/features/gardens/providers/garden_providers.dart';
 import 'package:hortus_app/features/map/providers/add_plant_provider.dart';
 import 'package:hortus_app/features/map/providers/garden_permissions_provider.dart';
 import 'package:hortus_app/features/map/providers/map_mode_provider.dart';
+import 'package:hortus_app/features/map/providers/map_transform_provider.dart';
 import 'package:hortus_app/features/map/providers/tilemap_provider.dart';
 import 'package:hortus_app/features/map/views/add_plant_page.dart';
 import 'package:hortus_app/features/map/views/garden_canvas.dart';
@@ -122,9 +123,9 @@ class _TopMapBar extends ConsumerWidget {
               const SizedBox(width: 8),
 
               IconButton(
-                icon: const Icon(Icons.center_focus_strong),
+                icon: const Icon(Icons.autorenew),
                 onPressed: () {
-                  /// plus tard : reset viewport
+                  ref.read(mapTransformProviderNotifier.notifier).reset();
                 },
               ),
             ],

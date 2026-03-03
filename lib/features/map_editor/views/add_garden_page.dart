@@ -713,7 +713,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
     final fittedW = _rotation == 0 ? mapW : mapH;
     final fittedH = _rotation == 0 ? mapH : mapW;
 
-    // 3️⃣ Scale FIT (⚠️ division, pas multiplication)
+    // 3️⃣ Scale FIT
     _scale = (math.max(fittedW / viewW, fittedH / viewH)) * 1.05;
 
     // 4️⃣ Centrage monde → viewport
@@ -749,7 +749,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
 
     final mapRect = Rect.fromPoints(topLeft, bottomRight);
 
-    const margin = 20.0; // 1px visible minimum
+    const margin = 20.0;
 
     final viewport = Rect.fromLTWH(
       0,
