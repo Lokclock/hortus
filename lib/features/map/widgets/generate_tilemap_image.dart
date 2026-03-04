@@ -1,7 +1,5 @@
 import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:hortus_app/features/map/providers/tilemap_provider.dart';
 
 const Map<int, int> soilMaskToIndex = {
@@ -55,11 +53,49 @@ Future<ui.Image> generateTilemapImage(
   final canvas = Canvas(recorder);
   final paint = Paint();
 
-  // Fond pour debug
-  canvas.drawRect(
-    Rect.fromLTWH(0, 0, tilesWide * tileSize, tilesHigh * tileSize),
-    Paint()..color = Colors.grey.shade200,
-  );
+  // ---- 1️⃣ Dessiner le fond uniquement (coins, bords, centre)
+  for (int y = 0; y < tilesHigh; y++) {
+    for (int x = 0; x < tilesWide; x++) {
+      final isTop = y == 0;
+      final isBottom = y == tilesHigh - 1;
+      final isLeft = x == 0;
+      final isRight = x == tilesWide - 1;
+
+      int index;
+      if (isTop && isLeft)
+        index = 5;
+      else if (isTop && isRight)
+        index = 7;
+      else if (isBottom && isLeft)
+        index = 25;
+      else if (isBottom && isRight)
+        index = 27;
+      else if (isTop)
+        index = 6;
+      else if (isBottom)
+        index = 26;
+      else if (isLeft)
+        index = 15;
+      else if (isRight)
+        index = 17;
+      else
+        index = 16;
+
+      final srcRect = Rect.fromLTWH(
+        (index % 10) * 64,
+        (index ~/ 10) * 64,
+        64,
+        64,
+      );
+
+      canvas.drawImageRect(
+        soilImage, // toujours soilImage pour le fond
+        srcRect,
+        Rect.fromLTWH(x * tileSize, y * tileSize, tileSize, tileSize),
+        paint,
+      );
+    }
+  }
 
   for (int y = 0; y < tilesHigh; y++) {
     for (int x = 0; x < tilesWide; x++) {

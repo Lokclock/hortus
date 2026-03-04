@@ -270,7 +270,8 @@ class GardenCanvasState extends ConsumerState<GardenCanvas> {
               });
             }
 
-            return SizedBox.expand(
+            return Container(
+              color: const ui.Color.fromARGB(162, 159, 212, 255),
               child: GestureDetector(
                 onTapDown: (details) {
                   final worldPos = _screenToWorld(details.localPosition);

@@ -2,8 +2,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:hortus_app/features/map/generate_tilemap_image.dart';
-import 'package:hortus_app/features/map_editor/providers/tile_editor_notifier.dart';
+import 'package:hortus_app/features/map/widgets/generate_tilemap_image.dart';
 
 /// TileType et extension pour convertir vers/depuis int
 enum TileType { empty, soil, hard }
