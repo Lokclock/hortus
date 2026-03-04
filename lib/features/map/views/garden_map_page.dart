@@ -16,7 +16,10 @@ import '../../plants/providers/plant_providers.dart';
 class GardenMapPage extends ConsumerWidget {
   final String gardenId;
 
-  const GardenMapPage({super.key, required this.gardenId});
+  final GlobalKey<GardenCanvasState> gardenCanvasKey =
+      GlobalKey<GardenCanvasState>();
+
+  GardenMapPage({super.key, required this.gardenId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -37,6 +40,7 @@ class GardenMapPage extends ConsumerWidget {
                 error: (e, _) => Center(child: Text("Erreur tilemap: $e")),
                 data: (tilemapImage) {
                   return GardenCanvas(
+                    key: gardenCanvasKey,
                     gardenId: gardenId,
                     plants: plants,
                     canEdit: canEdit,
@@ -56,7 +60,7 @@ class GardenMapPage extends ConsumerWidget {
 
           /// 🔝 MINI TOP BAR
           mode != MapMode.addPlant
-              ? _TopMapBar(gardenId: gardenId)
+              ? _TopMapBar(gardenId: gardenId, gardenCanvasKey: gardenCanvasKey)
               : const SizedBox(),
         ],
       ),
@@ -67,7 +71,9 @@ class GardenMapPage extends ConsumerWidget {
 class _TopMapBar extends ConsumerWidget {
   final String gardenId;
 
-  const _TopMapBar({required this.gardenId});
+  final GlobalKey<GardenCanvasState> gardenCanvasKey;
+
+  const _TopMapBar({required this.gardenId, required this.gardenCanvasKey});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -125,7 +131,13 @@ class _TopMapBar extends ConsumerWidget {
               IconButton(
                 icon: const Icon(Icons.autorenew),
                 onPressed: () {
-                  ref.read(mapTransformProviderNotifier.notifier).reset();
+                  final canvasState = gardenCanvasKey.currentState;
+                  if (canvasState != null && canvasState.mapWorldSize != null) {
+                    canvasState.resetViewToFit(
+                      canvasState.mapWorldSize!,
+                      margin: 20,
+                    );
+                  }
                 },
               ),
             ],

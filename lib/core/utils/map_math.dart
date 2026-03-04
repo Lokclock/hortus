@@ -1,27 +1,71 @@
+import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 
-Offset getWorldPosition({
-  required TransformationController controller,
+/// 🌍 Convertit un point écran (screen) → coordonnées monde (world)
+Offset screenToWorld({
+  required Offset screenPoint,
+  required Offset translation,
+  required double scale,
+  required double rotation,
   required Size viewportSize,
 }) {
-  final matrix = controller.value;
-
-  /// Inverse la matrice pour passer écran → monde
-  final inverse = Matrix4.inverted(matrix);
-
-  /// Centre de l'écran = position du viseur
+  // Centre de l'écran
   final center = Offset(viewportSize.width / 2, viewportSize.height / 2);
 
-  /// Convertir vers coordonnées monde
-  final transformed = MatrixUtils.transformPoint(inverse, center);
+  // Coordonnée relative au centre et translation
+  final relative = screenPoint - center - translation;
 
-  return transformed;
+  // Rotation inverse
+  final cosR = math.cos(-rotation);
+  final sinR = math.sin(-rotation);
+  final rotated = Offset(
+    relative.dx * cosR - relative.dy * sinR,
+    relative.dx * sinR + relative.dy * cosR,
+  );
+
+  // Scale inverse et remise au centre
+  final world = rotated / scale + center;
+
+  return world;
 }
 
-double worldCmToScreenPx({
-  required TransformationController controller,
-  required double cm,
+/// 🔄 Convertit un point monde → coordonnées écran
+Offset worldToScreen({
+  required Offset worldPoint,
+  required Offset translation,
+  required double scale,
+  required double rotation,
+  required Size viewportSize,
 }) {
-  final scale = controller.value.getMaxScaleOnAxis();
-  return cm * scale;
+  final center = Offset(viewportSize.width / 2, viewportSize.height / 2);
+
+  // relative au centre
+  final relative = (worldPoint - center) * scale;
+
+  // appliquer rotation
+  final cosR = math.cos(rotation);
+  final sinR = math.sin(rotation);
+  final rotated = Offset(
+    relative.dx * cosR - relative.dy * sinR,
+    relative.dx * sinR + relative.dy * cosR,
+  );
+
+  // translation et retour aux coordonnées écran
+  return rotated + center + translation;
+}
+
+/// 🌱 Convertit une distance monde (ex: cm ou px map) → pixels écran
+double worldDistanceToScreen({
+  required double distance,
+  required double scale,
+}) {
+  return distance * scale;
+}
+
+/// 🌱 Convertit une distance écran → distance monde
+double screenDistanceToWorld({
+  required double distance,
+  required double scale,
+}) {
+  return distance / scale;
 }

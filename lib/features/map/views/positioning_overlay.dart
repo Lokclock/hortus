@@ -58,12 +58,14 @@ class PositioningOverlay extends ConsumerWidget {
               icon: const Icon(Icons.check),
               onPressed: isReadyToPlant
                   ? () async {
-                      final controller = ref.read(mapTransformProvider);
                       final size = MediaQuery.of(context).size;
 
-                      final pos = getWorldPosition(
-                        controller: controller,
-                        viewportSize: size,
+                      final mapTransform = ref.read(
+                        mapTransformProviderNotifier,
+                      );
+
+                      final pos = mapTransform.screenToWorld(
+                        Offset(size.width / 2, size.height / 2),
                       );
 
                       final repo = ref.read(plantRepoProvider);
