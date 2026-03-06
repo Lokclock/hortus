@@ -86,7 +86,7 @@ class PlantDetailsSheet extends ConsumerWidget {
 
                       const SizedBox(height: 12),
 
-                      PlantPlantedDate(date: plant.plantedAt),
+                      PlantPlantedDate(plant: plant),
 
                       const SizedBox(height: 12),
 
