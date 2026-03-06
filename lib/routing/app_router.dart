@@ -53,10 +53,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             GardenSettingsPage(gardenId: s.pathParameters['id']!),
       ),
       GoRoute(
-        path: '/observations-chat/:id',
+        path: '/observations-chat/:gardenId/:plantId',
         builder: (context, state) {
-          final plantId = state.pathParameters['id']!;
-          return ObservationsChatPage(plantId: plantId);
+          final gardenId = state.pathParameters['gardenId']!;
+          final plantId = state.pathParameters['plantId']!;
+
+          return ObservationsChatPage(plantId: plantId, gardenId: gardenId);
         },
       ),
     ],

@@ -15,7 +15,7 @@ class PlantPlantedDate extends StatelessWidget {
       decoration: AppDecorations.block,
       child: Text(
         'Planté le : $formatted',
-        style: const TextStyle(fontSize: 14),
+        style: const TextStyle(fontSize: 16),
       ),
     );
   }

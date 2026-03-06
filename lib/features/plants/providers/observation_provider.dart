@@ -8,7 +8,11 @@ final observationRepoProvider = Provider((ref) {
 });
 
 final messagesProvider =
-    StreamProvider.family<List<ObservationMessage>, String>((ref, plantId) {
+    StreamProvider.family<
+      List<ObservationMessage>,
+      ({String gardenId, String plantId})
+    >((ref, params) {
       final repo = ref.watch(observationRepoProvider);
-      return repo.watchMessages(plantId);
+
+      return repo.watchMessages(params.gardenId, params.plantId);
     });

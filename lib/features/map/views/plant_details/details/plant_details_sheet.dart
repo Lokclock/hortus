@@ -78,7 +78,10 @@ class PlantDetailsSheet extends ConsumerWidget {
 
                               padding: const EdgeInsets.all(12),
                               width: double.infinity,
-                              child: Text('Galerie'),
+                              child: Text(
+                                'Galerie',
+                                style: TextStyle(fontSize: 16),
+                              ),
                             ),
 
                       const SizedBox(height: 12),
