@@ -124,4 +124,38 @@ class Plant {
       'images': images,
     };
   }
+
+  Plant copyWith({
+    String? name,
+    String? scientificName,
+    String? variety,
+    double? x,
+    double? y,
+    double? diameter,
+    String? symbol,
+    String? strate,
+    DateTime? plantedAt,
+    Map<String, DateTimeRange?>? harvestType,
+    String? imageUrl,
+    List<Map<String, dynamic>>? observations,
+    List<String>? images,
+  }) {
+    return Plant(
+      id: id,
+      gardenId: gardenId,
+      name: name ?? this.name,
+      scientificName: scientificName ?? this.scientificName,
+      variety: variety ?? this.variety,
+      x: x ?? this.x,
+      y: y ?? this.y,
+      diameter: diameter ?? this.diameter,
+      symbol: symbol ?? this.symbol,
+      strate: strate ?? this.strate,
+      plantedAt: plantedAt ?? this.plantedAt,
+      harvestType: harvestType ?? this.harvestType,
+      imageUrl: imageUrl ?? this.imageUrl,
+      observations: observations ?? this.observations,
+      images: images ?? this.images,
+    );
+  }
 }

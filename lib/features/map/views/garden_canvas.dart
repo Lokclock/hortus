@@ -6,7 +6,7 @@ import 'package:hortus_app/core/utils/map_math.dart';
 import 'package:hortus_app/features/gardens/providers/garden_providers.dart';
 import 'package:hortus_app/features/map/providers/animated_plant_provider.dart';
 import 'package:hortus_app/features/map/providers/map_transform_provider.dart';
-import 'package:hortus_app/features/map/views/plant_details_sheet.dart';
+import 'package:hortus_app/features/map/views/plant_details/details/plant_details_sheet.dart';
 import 'package:hortus_app/features/plants/models/plant_model.dart';
 import 'package:vector_math/vector_math_64.dart' hide Colors;
 
@@ -322,6 +322,7 @@ class GardenCanvasState extends ConsumerState<GardenCanvas> {
                     maxWidth: double.infinity,
                     maxHeight: double.infinity,
                     child: Stack(
+                      clipBehavior: Clip.none,
                       children: [
                         // Map
                         widget.tilemapImage != null

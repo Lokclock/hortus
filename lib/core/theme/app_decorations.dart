@@ -20,4 +20,9 @@ class AppDecorations {
     borderRadius: BorderRadius.circular(12),
     border: Border.all(color: AppColors.border),
   );
+
+  static BoxDecoration block = BoxDecoration(
+    color: Colors.grey.shade100,
+    borderRadius: BorderRadius.circular(12),
+  );
 }

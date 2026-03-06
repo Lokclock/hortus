@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hortus_app/core/widgets/app_list_tile.dart';
 import 'package:hortus_app/features/map/providers/garden_permissions_provider.dart';
-import 'package:hortus_app/features/map/views/plant_details_sheet.dart';
+import 'package:hortus_app/features/map/views/plant_details/details/plant_details_sheet.dart';
 import 'package:hortus_app/features/plants/providers/plant_providers.dart';
 
 void showPlantsList(BuildContext context, WidgetRef ref, String gardenId) {

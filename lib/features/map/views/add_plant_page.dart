@@ -66,8 +66,6 @@ class _AddPlantPageState extends ConsumerState<AddPlantPage> {
         body: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            LinearProgressIndicator(value: (step + 1) / 4),
-
             Expanded(
               child: PageView(
                 controller: controller,
@@ -299,79 +297,83 @@ class _StepHarvestState extends ConsumerState<_StepHarvest> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      itemCount: harvestImages.length,
-      itemBuilder: (context, index) {
-        final type = harvestImages.keys.elementAt(index);
-        final image = harvestImages[type]!;
-        final isSelected = localHarvests.containsKey(type);
+    return Padding(
+      padding: const EdgeInsets.only(top: 22, left: 12, right: 12),
+      child: ListView.builder(
+        itemCount: harvestImages.length,
+        itemBuilder: (context, index) {
+          final type = harvestImages.keys.elementAt(index);
+          final image = harvestImages[type]!;
+          final isSelected = localHarvests.containsKey(type);
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Image + tile
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    if (isSelected) {
-                      localHarvests.remove(type);
-                    } else {
-                      localHarvests[type] = null; // active mais pas de période
-                    }
-                    updateProvider();
-                  });
-                },
-                child: Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    color: isSelected ? Colors.green[200] : Colors.grey[200],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected ? Colors.green : Colors.grey,
-                      width: 2,
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Image + tile
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (isSelected) {
+                        localHarvests.remove(type);
+                      } else {
+                        localHarvests[type] =
+                            null; // active mais pas de période
+                      }
+                      updateProvider();
+                    });
+                  },
+                  child: Container(
+                    width: 70,
+                    height: 70,
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.green[200] : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? Colors.green : Colors.grey,
+                        width: 2,
+                      ),
                     ),
+                    padding: const EdgeInsets.all(8),
+                    child: Image.asset(image),
                   ),
-                  padding: const EdgeInsets.all(8),
-                  child: Image.asset(image),
                 ),
-              ),
 
-              const SizedBox(width: 16),
+                const SizedBox(width: 16),
 
-              // zone de période si sélectionné
-              Expanded(
-                child: isSelected
-                    ? GestureDetector(
-                        onTap: () => pickDateRange(type),
-                        child: Container(
-                          height: 70,
-                          alignment: Alignment.centerLeft,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.green[50],
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.green.shade200,
-                              width: 1.5,
+                // zone de période si sélectionné
+                Expanded(
+                  child: isSelected
+                      ? GestureDetector(
+                          onTap: () => pickDateRange(type),
+                          child: Container(
+                            height: 70,
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.green[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.green.shade200,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Text(
+                              localHarvests[type] != null
+                                  ? 'Période : ${localHarvests[type]!.start.day}/${localHarvests[type]!.start.month} - ${localHarvests[type]!.end.day}/${localHarvests[type]!.end.month}'
+                                  : 'Période : .../... - .../...',
+                              style: const TextStyle(fontSize: 16),
                             ),
                           ),
-                          child: Text(
-                            localHarvests[type] != null
-                                ? 'Période : ${localHarvests[type]!.start.day}/${localHarvests[type]!.start.month} - ${localHarvests[type]!.end.day}/${localHarvests[type]!.end.month}'
-                                : 'Période : .../... - .../...',
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                        ),
-                      )
-                    : const SizedBox(),
-              ),
-            ],
-          ),
-        );
-      },
+                        )
+                      : const SizedBox(),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -380,11 +382,11 @@ class _StepStrate extends ConsumerWidget {
   const _StepStrate();
 
   static const assets = {
-    'herb': 'assets/images/strates/herb.png',
-    'bush': 'assets/images/strates/bush.png',
-    'shrub': 'assets/images/strates/canopee.png',
-    'tree': 'assets/images/strates/tree.png',
-    'vine': 'assets/images/strates/vine.png',
+    'Herbacée': 'assets/images/strates/herb.png',
+    'Buisson': 'assets/images/strates/bush.png',
+    'Liane': 'assets/images/strates/vine.png',
+    'Arbuste': 'assets/images/strates/tree.png',
+    'Canopée': 'assets/images/strates/canopee.png',
   };
 
   @override
@@ -393,24 +395,24 @@ class _StepStrate extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.all(24),
-      child: GridView.count(
-        crossAxisCount: 3,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        children: assets.entries.map((e) {
-          final selected = state.strate == e.key;
+      child: ListView.separated(
+        itemCount: assets.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final entry = assets.entries.elementAt(index);
+          final selected = state.strate == entry.key;
 
           return _AnimatedTile(
-            asset: e.value,
-            label: e.key,
+            asset: entry.value,
+            label: entry.key,
             selected: selected,
             onTap: () {
               ref.read(addPlantProvider.notifier).state = state.copyWith(
-                strate: e.key,
+                strate: entry.key,
               );
             },
           );
-        }).toList(),
+        },
       ),
     );
   }
@@ -553,40 +555,46 @@ class _AnimatedTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: selected ? Colors.green.shade50 : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: selected ? Colors.green : Colors.grey.shade300,
-            width: 2,
-          ),
-          boxShadow: [
-            if (selected)
-              BoxShadow(
-                color: Colors.green.withOpacity(.2),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Expanded(child: Image.asset(asset)),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: selected ? Colors.green : Colors.black87,
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 45.0),
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: selected ? Colors.green.shade50 : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? Colors.green : Colors.grey.shade300,
+              width: 2,
             ),
-          ],
+            boxShadow: [
+              if (selected)
+                BoxShadow(
+                  color: Colors.green.withOpacity(.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              SizedBox(height: 68, child: Image.asset(asset)),
+
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  color: selected ? Colors.green : Colors.black87,
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
+          ),
         ),
       ),
     );

@@ -12,6 +12,7 @@ import 'package:hortus_app/features/map/views/garden_map_page.dart';
 import 'package:hortus_app/features/gardens/views/gardens_page.dart';
 import 'package:hortus_app/features/home/views/home_page.dart';
 import 'package:hortus_app/routing/router_notifier.dart';
+import 'package:hortus_app/features/map/views/plant_details/details/observations_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authNotifier = ref.watch(authNotifierProvider);
@@ -50,6 +51,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/garden-settings/:id',
         builder: (c, s) =>
             GardenSettingsPage(gardenId: s.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/observations-chat/:id',
+        builder: (context, state) {
+          final plantId = state.pathParameters['id']!;
+          return ObservationsChatPage(plantId: plantId);
+        },
       ),
     ],
   );
