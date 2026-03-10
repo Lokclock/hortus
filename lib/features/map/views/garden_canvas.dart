@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hortus_app/core/utils/map_math.dart';
 import 'package:hortus_app/features/gardens/providers/garden_providers.dart';
 import 'package:hortus_app/features/map/providers/animated_plant_provider.dart';
 import 'package:hortus_app/features/map/providers/map_transform_provider.dart';
@@ -333,7 +332,7 @@ class GardenCanvasState extends ConsumerState<GardenCanvas> {
                         ...widget.plants.map((p) {
                           final worldPos = Offset(p.x, p.y);
 
-                          final diameterPx = p.diameter * (64 / 20);
+                          final diameterPx = p.diameter * (32 / 20);
 
                           final animatedId = ref.watch(animatedPlantProvider);
                           final isAnimated = animatedId == p.id;

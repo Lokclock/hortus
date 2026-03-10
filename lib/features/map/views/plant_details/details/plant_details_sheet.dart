@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hortus_app/core/theme/app_decorations.dart';
+import 'package:hortus_app/features/map/providers/add_plant_provider.dart';
+import 'package:hortus_app/features/map/providers/map_mode_provider.dart';
 import 'package:hortus_app/features/map/views/add_plant_page.dart';
 import 'package:hortus_app/features/map/views/plant_details/details/plant_edit_button.dart';
 import 'package:hortus_app/features/map/views/plant_details/details/plant_gallery.dart';
@@ -89,12 +91,18 @@ class PlantDetailsSheet extends ConsumerWidget {
                       PlantPlantedDate(plant: plant),
 
                       const SizedBox(height: 12),
+                      PlantEditButton(
+                        onPressed: () {
+                          ref
+                              .read(addPlantProvider.notifier)
+                              .startMovePlant(plant);
 
-                      if (canEdit)
-                        PlantEditButton(
-                          onPressed: () => _openAddPlantPage(context, plant),
-                        ),
-                      const SizedBox(height: 12),
+                          ref.read(mapModeProvider.notifier).state =
+                              MapMode.addPlant;
+
+                          Navigator.pop(context);
+                        },
+                      ),
                     ],
                   ),
                 ),

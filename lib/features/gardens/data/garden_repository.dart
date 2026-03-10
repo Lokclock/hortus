@@ -106,7 +106,7 @@ class GardenRepository {
       'tilemap': flatTiles, // List<int> aplati
       'tilesWide': tiles.first.length,
       'tilesHigh': tiles.length,
-      'tileSize': 64.0,
+      'tileSize': 32.0,
     });
 
     return docRef; // <-- retourne le DocumentReference

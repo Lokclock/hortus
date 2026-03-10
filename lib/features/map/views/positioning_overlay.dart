@@ -18,6 +18,8 @@ class PositioningOverlay extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(mapModeProvider);
     final plantData = ref.watch(addPlantProvider);
+    final mapTransform = ref.watch(mapTransformProviderNotifier);
+    final scale = mapTransform.scale;
 
     // Si on est en mode view, rien à afficher
     if (mode == MapMode.view) return const SizedBox();
@@ -42,6 +44,20 @@ class PositioningOverlay extends ConsumerWidget {
 
         const DiameterPreview(),
 
+        if (plantData.symbol != null && plantData.diameter != null)
+          Center(
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: 0.6,
+                child: Image.asset(
+                  plantData.symbol!,
+                  width: plantData.diameter! * (32 / 20) * scale,
+                  height: plantData.diameter! * (32 / 20) * scale,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+          ),
         // Viseur centré
         const Center(child: Crosshair()),
 
@@ -92,8 +108,7 @@ class PositioningOverlay extends ConsumerWidget {
                       }
 
                       // Reset le provider et repasse en mode view
-                      ref.read(addPlantProvider.notifier).state =
-                          const AddPlantState();
+                      ref.read(addPlantProvider.notifier).reset();
                       ref.read(mapModeProvider.notifier).state = MapMode.view;
                     }
                   : null, // désactive si champs obligatoires manquants

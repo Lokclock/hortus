@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hortus_app/features/plants/models/plant_model.dart';
 
 class AddPlantState {
   final String? id;
@@ -50,7 +51,32 @@ class AddPlantState {
   }
 }
 
-// Provider pour gérer l'état temporaire avant validation sur la carte
-final addPlantProvider = StateProvider<AddPlantState>(
-  (ref) => const AddPlantState(),
+class AddPlantNotifier extends StateNotifier<AddPlantState> {
+  AddPlantNotifier() : super(const AddPlantState());
+
+  void reset() {
+    state = const AddPlantState();
+  }
+
+  void startMovePlant(Plant plant) {
+    state = AddPlantState(
+      id: plant.id,
+      name: plant.name,
+      scientificName: plant.scientificName,
+      variety: plant.variety,
+      strate: plant.strate,
+      symbol: plant.symbol,
+      plantedAt: plant.plantedAt,
+      diameter: plant.diameter,
+      harvestType: plant.harvestType,
+    );
+  }
+
+  void update(AddPlantState newState) {
+    state = newState;
+  }
+}
+
+final addPlantProvider = StateNotifierProvider<AddPlantNotifier, AddPlantState>(
+  (ref) => AddPlantNotifier(),
 );

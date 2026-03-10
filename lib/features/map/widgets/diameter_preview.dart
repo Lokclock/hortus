@@ -4,7 +4,7 @@ import 'package:hortus_app/features/map/providers/map_transform_provider.dart';
 import 'package:hortus_app/features/map/providers/add_plant_provider.dart';
 
 class DiameterPreview extends ConsumerWidget {
-  final double tilePixelSize = 64; // taille tile en px
+  final double tilePixelSize = 32; // taille tile en px
   final double tileCmSize = 20; // taille tile en cm
 
   const DiameterPreview({super.key});
@@ -29,7 +29,10 @@ class DiameterPreview extends ConsumerWidget {
             shape: BoxShape.circle,
 
             color: Colors.green.withOpacity(0.15),
-            border: Border.all(color: Colors.green.withOpacity(0.6), width: 2),
+            border: Border.all(
+              color: const Color.fromARGB(255, 240, 67, 67).withOpacity(0.6),
+              width: 2,
+            ),
           ),
         ),
       ),

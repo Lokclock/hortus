@@ -82,10 +82,10 @@ Future<ui.Image> generateTilemapImage(
         index = 16;
 
       final srcRect = Rect.fromLTWH(
-        (index % 10) * 64,
-        (index ~/ 10) * 64,
-        64,
-        64,
+        (index % 10) * 32,
+        (index ~/ 10) * 32,
+        32,
+        32,
       );
 
       canvas.drawImageRect(
@@ -105,8 +105,7 @@ Future<ui.Image> generateTilemapImage(
       // ---- Calculer mask
       final mask = computeMask(x, y, tiles);
 
-      final double tileSize = 64; // taille de la tuile sur le canvas
-      final int tilePixelSize = 64;
+      final int tilePixelSize = 32;
       final int soilColumns = 10;
       final int hardColumns = 4;
 

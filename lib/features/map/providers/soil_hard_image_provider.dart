@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final soilImageProvider = FutureProvider<ui.Image>((ref) async {
-  final data = await rootBundle.load('assets/tiles/tilemap_soil.png');
+  final data = await rootBundle.load('assets/tiles/tilemap_soil_v2.png');
   final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
   final frame = await codec.getNextFrame();
   return frame.image;

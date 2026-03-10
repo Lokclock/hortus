@@ -202,10 +202,10 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
           index = 16;
 
         final srcRect = Rect.fromLTWH(
-          (index % 10) * 64,
-          (index ~/ 10) * 64,
-          64,
-          64,
+          (index % 10) * 32,
+          (index ~/ 10) * 32,
+          32,
+          32,
         );
 
         canvas.drawImageRect(
@@ -250,7 +250,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
 
   Future<void> loadTileset() async {
     // Soil
-    final soilData = await rootBundle.load('assets/tiles/tilemap_soil.png');
+    final soilData = await rootBundle.load('assets/tiles/tilemap_soil_v2.png');
     final soilCodec = await ui.instantiateImageCodec(
       soilData.buffer.asUint8List(),
     );
@@ -258,7 +258,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
     soilImage = soilFrame.image;
 
     soilRects = generateAutoTileRects(
-      tilePixelSize: 64,
+      tilePixelSize: 32,
       columns: 10,
       startIndex: 0,
       tileType: 'soil',
@@ -273,7 +273,7 @@ class _AddGardenPageState extends ConsumerState<AddGardenPage> {
     hardImage = hardFrame.image;
 
     hardRects = generateAutoTileRects(
-      tilePixelSize: 64,
+      tilePixelSize: 32,
       columns: 4,
       startIndex: 0,
       tileType: 'hard',
